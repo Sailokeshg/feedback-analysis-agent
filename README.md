@@ -1,5 +1,9 @@
 # AI Customer Insights Agent
 
+[![Server CI](https://github.com/your-org/feedback-analysis-agent/actions/workflows/server-ci.yml/badge.svg)](https://github.com/your-org/feedback-analysis-agent/actions/workflows/server-ci.yml)
+[![Client CI](https://github.com/your-org/feedback-analysis-agent/actions/workflows/client-ci.yml/badge.svg)](https://github.com/your-org/feedback-analysis-agent/actions/workflows/client-ci.yml)
+[![Worker CI](https://github.com/your-org/feedback-analysis-agent/actions/workflows/worker-ci.yml/badge.svg)](https://github.com/your-org/feedback-analysis-agent/actions/workflows/worker-ci.yml)
+
 A local-first MVP for analyzing customer feedback with sentiment analysis, topic clustering, and agentic Q&A capabilities.
 
 ## Architecture
