@@ -30,6 +30,9 @@ dependencies = [
     "passlib[bcrypt]==1.7.4",
     "pgvector==0.2.4",
     "pydantic-settings==2.1.0",
+    "langchain==0.1.5",
+    "langchain-community==0.0.13",
+    "langchain-openai==0.0.5",
 ]
 
 [project.optional-dependencies]
