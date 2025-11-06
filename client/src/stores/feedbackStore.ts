@@ -1,0 +1,117 @@
+import { create } from 'zustand';
+import { FeedbackItem, TopicCluster, SentimentTrend, QueryResult } from '../types';
+
+interface FeedbackStore {
+  feedbackItems: FeedbackItem[];
+  topicClusters: TopicCluster[];
+  sentimentTrends: SentimentTrend[];
+  isLoading: boolean;
+  error: string | null;
+
+  // Actions
+  fetchFeedback: () => Promise<void>;
+  fetchTopics: () => Promise<void>;
+  fetchTrends: () => Promise<void>;
+  askQuestion: (query: string) => Promise<QueryResult>;
+  uploadFeedback: (file: File) => Promise<void>;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+}
+
+export const useFeedbackStore = create<FeedbackStore>((set, get) => ({
+  feedbackItems: [],
+  topicClusters: [],
+  sentimentTrends: [],
+  isLoading: false,
+  error: null,
+
+  fetchFeedback: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('/api/feedback');
+      const data = await response.json();
+      set({ feedbackItems: data });
+    } catch (error) {
+      set({ error: 'Failed to fetch feedback' });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  fetchTopics: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('/api/topics');
+      const data = await response.json();
+      set({ topicClusters: data });
+    } catch (error) {
+      set({ error: 'Failed to fetch topics' });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  fetchTrends: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('/api/trends');
+      const data = await response.json();
+      set({ sentimentTrends: data });
+    } catch (error) {
+      set({ error: 'Failed to fetch trends' });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  askQuestion: async (query: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('/api/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      set({ error: 'Failed to process query' });
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  uploadFeedback: async (file: File) => {
+    set({ isLoading: true, error: null });
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      // Refresh data after upload
+      await Promise.all([
+        get().fetchFeedback(),
+        get().fetchTopics(),
+        get().fetchTrends(),
+      ]);
+    } catch (error) {
+      set({ error: 'Failed to upload feedback' });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  setLoading: (isLoading) => set({ isLoading }),
+  setError: (error) => set({ error }),
+}));

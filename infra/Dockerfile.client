@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY client/package*.json ./client/
+
+# Install dependencies
+RUN cd client && npm ci
+
+# Copy client source
+COPY client/ ./client/
+
+# Build the client
+RUN cd client && npm run build
+
+# Install serve to serve the built app
+RUN npm install -g serve
+
+EXPOSE 3000
+
+CMD ["serve", "-s", "client/dist", "-l", "3000"]

@@ -1,0 +1,28 @@
+{
+  "name": "ai-customer-insights-agent",
+  "version": "0.1.0",
+  "description": "Mono-repo for AI Customer Insights Agent",
+  "private": true,
+  "workspaces": [
+    "client"
+  ],
+  "scripts": {
+    "bootstrap": "./scripts/bootstrap.sh",
+    "dev-setup": "./scripts/dev-setup.sh",
+    "dev": "make dev",
+    "build": "make build",
+    "test": "make test",
+    "lint": "make lint",
+    "format": "make format",
+    "docker-up": "make docker-up",
+    "docker-down": "make docker-down",
+    "clean": "make clean"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

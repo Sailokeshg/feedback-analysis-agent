@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-customer-insights-worker"
+version = "0.1.0"
+description = "RQ worker for processing customer feedback in background"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "rq==1.15.1",
+    "redis==5.0.1",
+    "sqlalchemy==2.0.23",
+    "psycopg2-binary==2.9.9",
+    "sentence-transformers==2.2.2",
+    "chromadb==0.4.18",
+    "faiss-cpu==1.7.4",
+    "transformers==4.35.2",
+    "torch==2.1.1",
+    "numpy==1.24.3",
+    "pandas==2.1.4",
+    "vadersentiment==3.3.2",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
