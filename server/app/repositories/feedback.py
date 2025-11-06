@@ -2,9 +2,12 @@
 Feedback repository for CRUD operations on feedback data.
 """
 
-from typing import List, Dict, Any, Optional
+import hashlib
+from datetime import datetime
+from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from .base import BaseRepository, PaginationParams, DateFilter
 from ..models import Feedback, NLPAnnotation
@@ -15,19 +18,46 @@ class FeedbackRepository(BaseRepository[Feedback]):
     def __init__(self, session: Session):
         super().__init__(session)
 
+    def _generate_content_hash(self, text: str, created_at: Optional[str] = None) -> str:
+        """Generate a hash for duplicate detection based on text and creation date."""
+        content = text.strip().lower()
+        if created_at:
+            # Normalize the date to YYYY-MM-DD format for consistent hashing
+            try:
+                if isinstance(created_at, str):
+                    # Parse various date formats and normalize
+                    parsed_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    date_str = parsed_date.date().isoformat()
+                else:
+                    date_str = created_at.date().isoformat()
+                content += f"|{date_str}"
+            except (ValueError, AttributeError):
+                # If date parsing fails, just use the text
+                pass
+
+        return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+    def check_duplicate(self, content_hash: str) -> Optional[UUID]:
+        """Check if feedback with this content hash already exists."""
+        query = "SELECT id FROM feedback WHERE meta->>'content_hash' = :content_hash LIMIT 1"
+        result = self.execute_query(query, {"content_hash": content_hash}, fetch="one")
+        return UUID(result["id"]) if result else None
+
     def create_feedback(
         self,
         source: str,
         text: str,
         customer_id: Optional[str] = None,
-        meta: Optional[Dict[str, Any]] = None
+        meta: Optional[Dict[str, Any]] = None,
+        created_at: Optional[datetime] = None
     ) -> Feedback:
         """Create a new feedback entry."""
         feedback = Feedback(
             source=source,
             text=text,
             customer_id=customer_id,
-            meta=meta or {}
+            meta=meta or {},
+            created_at=created_at or datetime.utcnow()
         )
 
         self.session.add(feedback)
@@ -35,6 +65,122 @@ class FeedbackRepository(BaseRepository[Feedback]):
         self.session.refresh(feedback)
 
         return feedback
+
+    def create_feedback_with_duplicate_check(
+        self,
+        source: str,
+        text: str,
+        customer_id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+        created_at: Optional[datetime] = None
+    ) -> Tuple[Feedback, bool]:
+        """
+        Create feedback with duplicate detection.
+        Returns (feedback, is_duplicate)
+        """
+        # Generate content hash for duplicate detection
+        content_hash = self._generate_content_hash(text, created_at.isoformat() if created_at else None)
+
+        # Check for existing feedback with same hash
+        existing_id = self.check_duplicate(content_hash)
+        if existing_id:
+            # Return existing feedback and mark as duplicate
+            existing_feedback = self.get_feedback_by_id(existing_id)
+            return existing_feedback, True
+
+        # Create new feedback with hash in meta
+        if meta is None:
+            meta = {}
+        meta["content_hash"] = content_hash
+
+        feedback = self.create_feedback(
+            source=source,
+            text=text,
+            customer_id=customer_id,
+            meta=meta,
+            created_at=created_at
+        )
+
+        return feedback, False
+
+    def create_feedback_batch(
+        self,
+        feedback_items: List[Dict[str, Any]],
+        source: str = "batch_ingest"
+    ) -> Dict[str, Any]:
+        """
+        Create multiple feedback items with duplicate detection.
+        Returns summary of created and duplicate items.
+        """
+        created = []
+        duplicates = []
+        errors = []
+
+        for i, item in enumerate(feedback_items):
+            try:
+                # Validate required fields
+                if "text" not in item or not item["text"].strip():
+                    errors.append({
+                        "index": i,
+                        "error": "Missing or empty 'text' field"
+                    })
+                    continue
+
+                # Parse optional fields
+                customer_id = item.get("customer_id")
+                meta = item.get("meta", {})
+
+                # Parse created_at if provided
+                created_at = None
+                if "created_at" in item and item["created_at"]:
+                    try:
+                        created_at = datetime.fromisoformat(item["created_at"].replace('Z', '+00:00'))
+                    except ValueError:
+                        errors.append({
+                            "index": i,
+                            "error": f"Invalid created_at format: {item['created_at']}"
+                        })
+                        continue
+
+                # Create feedback with duplicate check
+                feedback, is_duplicate = self.create_feedback_with_duplicate_check(
+                    source=source,
+                    text=item["text"],
+                    customer_id=customer_id,
+                    meta=meta,
+                    created_at=created_at
+                )
+
+                if is_duplicate:
+                    duplicates.append({
+                        "index": i,
+                        "id": str(feedback.id),
+                        "existing_created_at": feedback.created_at.isoformat()
+                    })
+                else:
+                    created.append({
+                        "index": i,
+                        "id": str(feedback.id),
+                        "created_at": feedback.created_at.isoformat()
+                    })
+
+            except Exception as e:
+                errors.append({
+                    "index": i,
+                    "error": str(e)
+                })
+
+        return {
+            "created": created,
+            "duplicates": duplicates,
+            "errors": errors,
+            "summary": {
+                "total_processed": len(feedback_items),
+                "created_count": len(created),
+                "duplicate_count": len(duplicates),
+                "error_count": len(errors)
+            }
+        }
 
     def get_feedback_by_id(self, feedback_id: UUID) -> Optional[Feedback]:
         """Get feedback by ID with annotations."""

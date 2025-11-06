@@ -1,0 +1,6 @@
+text,created_at,customer_id,rating,category
+Great product! Highly recommend this to everyone,2024-01-15T10:30:00Z,CUST_001,5,electronics
+This is okay, nothing special about it,2024-01-16T14:20:00Z,CUST_002,3,books
+Terrible service, very disappointed with the support,2024-01-17T09:15:00Z,CUST_003,1,support
+Amazing customer service experience,2024-01-18T16:45:00Z,CUST_004,5,support
+Product arrived damaged, poor packaging,2024-01-19T11:30:00Z,CUST_005,2,shipping

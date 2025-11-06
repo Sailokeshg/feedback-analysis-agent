@@ -2,16 +2,30 @@
 Ingestion router for data intake operations.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+import csv
+import io
+import json
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
-import json
+from pydantic import BaseModel
 
 from ..services.database import get_db
 from ..repositories import FeedbackRepository
+from ..jobs import enqueue_feedback_batch_processing
 from ..config import settings
 
 router = APIRouter()
+
+class IngestResponse(BaseModel):
+    """Response model for ingest operations."""
+    batch_id: str
+    processed_count: int
+    created_count: int
+    duplicate_count: int
+    error_count: int
+    job_id: Optional[str] = None
 
 @router.post("/feedback")
 async def create_feedback(
@@ -142,6 +156,169 @@ async def upload_csv_feedback(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process upload: {str(e)}")
 
+@router.post("/", response_model=IngestResponse)
+async def ingest_feedback_data(
+    file: UploadFile = File(...),
+    source: str = Form("ingest_api", description="Source identifier for the feedback"),
+    process_async: bool = Form(True, description="Process feedback asynchronously"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest feedback data from CSV or JSONL file.
+
+    Validates each row for required fields and stores in database with duplicate detection.
+    Enqueues background processing job for NLP analysis.
+
+    Supported formats:
+    - CSV: text,created_at?,customer_id?,meta?
+    - JSONL: {"text": "...", "created_at": "...", "customer_id": "...", "meta": {...}}
+    """
+    try:
+        # Validate file format
+        if not (file.filename.endswith('.csv') or file.filename.endswith('.jsonl') or file.filename.endswith('.json')):
+            raise HTTPException(
+                status_code=400,
+                detail="File must be CSV (.csv) or JSONL (.jsonl/.json)"
+            )
+
+        # Read file content
+        content = await file.read()
+        file_content = content.decode('utf-8')
+
+        # Parse data based on format
+        feedback_items = []
+
+        if file.filename.endswith('.csv'):
+            feedback_items = _parse_csv_data(file_content)
+        else:  # JSONL
+            feedback_items = _parse_jsonl_data(file_content)
+
+        if not feedback_items:
+            raise HTTPException(status_code=400, detail="No valid feedback items found in file")
+
+        # Generate batch ID
+        batch_id = str(uuid.uuid4())
+
+        # Process batch with duplicate detection
+        repo = FeedbackRepository(db)
+        batch_result = repo.create_feedback_batch(feedback_items, source)
+
+        # Update source in meta for tracking
+        for item in batch_result["created"] + batch_result["duplicates"]:
+            # Mark items as part of this batch
+            pass  # Could update meta with batch_id if needed
+
+        # Enqueue background processing job if requested
+        job_id = None
+        if process_async and batch_result["created"]:
+            feedback_ids = [item["id"] for item in batch_result["created"]]
+            try:
+                job_id = enqueue_feedback_batch_processing(
+                    feedback_ids=feedback_ids,
+                    batch_id=batch_id,
+                    source=source
+                )
+            except Exception as e:
+                # Log error but don't fail the ingestion
+                print(f"Failed to enqueue processing job: {e}")
+
+        return IngestResponse(
+            batch_id=batch_id,
+            processed_count=batch_result["summary"]["total_processed"],
+            created_count=batch_result["summary"]["created_count"],
+            duplicate_count=batch_result["summary"]["duplicate_count"],
+            error_count=batch_result["summary"]["error_count"],
+            job_id=job_id
+        )
+
+    except HTTPException:
+        raise
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process ingestion: {str(e)}")
+
+def _parse_csv_data(csv_content: str) -> List[Dict[str, Any]]:
+    """Parse CSV data into feedback items."""
+    feedback_items = []
+
+    # Use csv module for proper parsing
+    reader = csv.DictReader(io.StringIO(csv_content))
+
+    for row_num, row in enumerate(reader, 1):
+        # Validate required text field
+        text = row.get('text', '').strip()
+        if not text:
+            continue  # Skip empty rows
+
+        item = {"text": text}
+
+        # Optional fields
+        if row.get('created_at', '').strip():
+            item['created_at'] = row['created_at'].strip()
+
+        if row.get('customer_id', '').strip():
+            item['customer_id'] = row['customer_id'].strip()
+
+        # Meta field - everything else goes into meta
+        meta = {}
+        for key, value in row.items():
+            if key not in ['text', 'created_at', 'customer_id'] and value.strip():
+                meta[key] = value.strip()
+
+        if meta:
+            item['meta'] = meta
+
+        feedback_items.append(item)
+
+    return feedback_items
+
+def _parse_jsonl_data(jsonl_content: str) -> List[Dict[str, Any]]:
+    """Parse JSONL data into feedback items."""
+    feedback_items = []
+
+    for line_num, line in enumerate(jsonl_content.strip().split('\n'), 1):
+        line = line.strip()
+        if not line:
+            continue
+
+        try:
+            item = json.loads(line)
+
+            # Validate it's a dict with text field
+            if not isinstance(item, dict):
+                continue
+
+            text = item.get('text', '').strip()
+            if not text:
+                continue
+
+            # Ensure required fields and clean up
+            cleaned_item = {"text": text}
+
+            if item.get('created_at'):
+                cleaned_item['created_at'] = item['created_at']
+
+            if item.get('customer_id'):
+                cleaned_item['customer_id'] = item['customer_id']
+
+            # Meta - everything except the main fields
+            meta = {}
+            for key, value in item.items():
+                if key not in ['text', 'created_at', 'customer_id']:
+                    meta[key] = value
+
+            if meta:
+                cleaned_item['meta'] = meta
+
+            feedback_items.append(cleaned_item)
+
+        except json.JSONDecodeError:
+            # Skip malformed JSON lines
+            continue
+
+    return feedback_items
+
 @router.post("/upload/json")
 async def upload_json_feedback(
     file: UploadFile = File(...),
@@ -201,3 +378,166 @@ async def upload_json_feedback(
         raise HTTPException(status_code=400, detail="File must be UTF-8 encoded")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process upload: {str(e)}")
+
+@router.post("/", response_model=IngestResponse)
+async def ingest_feedback_data(
+    file: UploadFile = File(...),
+    source: str = Form("ingest_api", description="Source identifier for the feedback"),
+    process_async: bool = Form(True, description="Process feedback asynchronously"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest feedback data from CSV or JSONL file.
+
+    Validates each row for required fields and stores in database with duplicate detection.
+    Enqueues background processing job for NLP analysis.
+
+    Supported formats:
+    - CSV: text,created_at?,customer_id?,meta?
+    - JSONL: {"text": "...", "created_at": "...", "customer_id": "...", "meta": {...}}
+    """
+    try:
+        # Validate file format
+        if not (file.filename.endswith('.csv') or file.filename.endswith('.jsonl') or file.filename.endswith('.json')):
+            raise HTTPException(
+                status_code=400,
+                detail="File must be CSV (.csv) or JSONL (.jsonl/.json)"
+            )
+
+        # Read file content
+        content = await file.read()
+        file_content = content.decode('utf-8')
+
+        # Parse data based on format
+        feedback_items = []
+
+        if file.filename.endswith('.csv'):
+            feedback_items = _parse_csv_data(file_content)
+        else:  # JSONL
+            feedback_items = _parse_jsonl_data(file_content)
+
+        if not feedback_items:
+            raise HTTPException(status_code=400, detail="No valid feedback items found in file")
+
+        # Generate batch ID
+        batch_id = str(uuid.uuid4())
+
+        # Process batch with duplicate detection
+        repo = FeedbackRepository(db)
+        batch_result = repo.create_feedback_batch(feedback_items, source)
+
+        # Update source in meta for tracking
+        for item in batch_result["created"] + batch_result["duplicates"]:
+            # Mark items as part of this batch
+            pass  # Could update meta with batch_id if needed
+
+        # Enqueue background processing job if requested
+        job_id = None
+        if process_async and batch_result["created"]:
+            feedback_ids = [item["id"] for item in batch_result["created"]]
+            try:
+                job_id = enqueue_feedback_batch_processing(
+                    feedback_ids=feedback_ids,
+                    batch_id=batch_id,
+                    source=source
+                )
+            except Exception as e:
+                # Log error but don't fail the ingestion
+                print(f"Failed to enqueue processing job: {e}")
+
+        return IngestResponse(
+            batch_id=batch_id,
+            processed_count=batch_result["summary"]["total_processed"],
+            created_count=batch_result["summary"]["created_count"],
+            duplicate_count=batch_result["summary"]["duplicate_count"],
+            error_count=batch_result["summary"]["error_count"],
+            job_id=job_id
+        )
+
+    except HTTPException:
+        raise
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process ingestion: {str(e)}")
+
+def _parse_csv_data(csv_content: str) -> List[Dict[str, Any]]:
+    """Parse CSV data into feedback items."""
+    feedback_items = []
+
+    # Use csv module for proper parsing
+    reader = csv.DictReader(io.StringIO(csv_content))
+
+    for row_num, row in enumerate(reader, 1):
+        # Validate required text field
+        text = row.get('text', '').strip()
+        if not text:
+            continue  # Skip empty rows
+
+        item = {"text": text}
+
+        # Optional fields
+        if row.get('created_at', '').strip():
+            item['created_at'] = row['created_at'].strip()
+
+        if row.get('customer_id', '').strip():
+            item['customer_id'] = row['customer_id'].strip()
+
+        # Meta field - everything else goes into meta
+        meta = {}
+        for key, value in row.items():
+            if key not in ['text', 'created_at', 'customer_id'] and value.strip():
+                meta[key] = value.strip()
+
+        if meta:
+            item['meta'] = meta
+
+        feedback_items.append(item)
+
+    return feedback_items
+
+def _parse_jsonl_data(jsonl_content: str) -> List[Dict[str, Any]]:
+    """Parse JSONL data into feedback items."""
+    feedback_items = []
+
+    for line_num, line in enumerate(jsonl_content.strip().split('\n'), 1):
+        line = line.strip()
+        if not line:
+            continue
+
+        try:
+            item = json.loads(line)
+
+            # Validate it's a dict with text field
+            if not isinstance(item, dict):
+                continue
+
+            text = item.get('text', '').strip()
+            if not text:
+                continue
+
+            # Ensure required fields and clean up
+            cleaned_item = {"text": text}
+
+            if item.get('created_at'):
+                cleaned_item['created_at'] = item['created_at']
+
+            if item.get('customer_id'):
+                cleaned_item['customer_id'] = item['customer_id']
+
+            # Meta - everything except the main fields
+            meta = {}
+            for key, value in item.items():
+                if key not in ['text', 'created_at', 'customer_id']:
+                    meta[key] = value
+
+            if meta:
+                cleaned_item['meta'] = meta
+
+            feedback_items.append(cleaned_item)
+
+        except json.JSONDecodeError:
+            # Skip malformed JSON lines
+            continue
+
+    return feedback_items
