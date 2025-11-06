@@ -24,6 +24,8 @@ class Feedback(Base):
     created_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, nullable=False)
     customer_id = Column(String, nullable=True)
     text = Column(Text, nullable=False)
+    normalized_text = Column(Text, nullable=True)  # Normalized version for processing
+    detected_language = Column(String, nullable=True)  # Detected language code
     meta = Column(JSONB, nullable=False, default=dict)
 
     # Relationship to NLP annotations

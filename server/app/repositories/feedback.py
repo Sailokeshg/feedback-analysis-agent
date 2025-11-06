@@ -49,7 +49,9 @@ class FeedbackRepository(BaseRepository[Feedback]):
         text: str,
         customer_id: Optional[str] = None,
         meta: Optional[Dict[str, Any]] = None,
-        created_at: Optional[datetime] = None
+        created_at: Optional[datetime] = None,
+        normalized_text: Optional[str] = None,
+        detected_language: Optional[str] = None
     ) -> Feedback:
         """Create a new feedback entry."""
         feedback = Feedback(
@@ -57,7 +59,9 @@ class FeedbackRepository(BaseRepository[Feedback]):
             text=text,
             customer_id=customer_id,
             meta=meta or {},
-            created_at=created_at or datetime.utcnow()
+            created_at=created_at or datetime.utcnow(),
+            normalized_text=normalized_text,
+            detected_language=detected_language
         )
 
         self.session.add(feedback)
@@ -303,6 +307,45 @@ class FeedbackRepository(BaseRepository[Feedback]):
         self.session.refresh(annotation)
 
         return annotation
+
+    def update_annotation_topic(self, feedback_id: UUID, topic_id: Optional[int]) -> bool:
+        """Update the topic_id for a feedback's annotation."""
+        try:
+            # Find the annotation for this feedback
+            annotation = (
+                self.session.query(NLPAnnotation)
+                .filter(NLPAnnotation.feedback_id == feedback_id)
+                .first()
+            )
+
+            if annotation:
+                annotation.topic_id = topic_id
+                self.session.commit()
+                return True
+            return False
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def bulk_update_annotation_topics(self, updates: List[Tuple[UUID, Optional[int]]]) -> int:
+        """
+        Bulk update topic_ids for multiple feedback annotations.
+
+        Args:
+            updates: List of (feedback_id, topic_id) tuples
+
+        Returns:
+            Number of successfully updated annotations
+        """
+        updated_count = 0
+        try:
+            for feedback_id, topic_id in updates:
+                if self.update_annotation_topic(feedback_id, topic_id):
+                    updated_count += 1
+            return updated_count
+        except Exception:
+            self.session.rollback()
+            raise
 
     def get_feedback_with_annotations(
         self,

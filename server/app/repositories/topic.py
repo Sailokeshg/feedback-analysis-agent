@@ -131,3 +131,68 @@ class TopicRepository(BaseRepository[Topic]):
             }
             for log, topic_label in audit_logs
         ]
+
+    def get_or_create_topic(self, label: str, keywords: List[str], changed_by: str = "system") -> Topic:
+        """
+        Get existing topic by label or create new one.
+
+        Args:
+            label: Topic label
+            keywords: Topic keywords
+            changed_by: User/system identifier
+
+        Returns:
+            Topic object
+        """
+        # Try to find existing topic with same label
+        existing_topic = (
+            self.session.query(Topic)
+            .filter(Topic.label == label)
+            .first()
+        )
+
+        if existing_topic:
+            # Update keywords if they differ
+            if set(existing_topic.keywords or []) != set(keywords):
+                return self.update_topic_label(
+                    existing_topic.id,
+                    existing_topic.label,
+                    keywords,
+                    changed_by
+                )
+            return existing_topic
+
+        # Create new topic
+        topic = Topic(
+            label=label,
+            keywords=keywords
+        )
+
+        self.session.add(topic)
+        self.session.commit()
+        self.session.refresh(topic)
+
+        logger.info(f"Created new topic: {label} with {len(keywords)} keywords")
+        return topic
+
+    def bulk_create_topics(self, topic_data: List[Dict[str, Any]], changed_by: str = "system") -> List[Topic]:
+        """
+        Bulk create or update topics.
+
+        Args:
+            topic_data: List of dicts with 'label' and 'keywords' keys
+            changed_by: User/system identifier
+
+        Returns:
+            List of created/updated topic objects
+        """
+        topics = []
+        for data in topic_data:
+            topic = self.get_or_create_topic(
+                data['label'],
+                data['keywords'],
+                changed_by
+            )
+            topics.append(topic)
+
+        return topics

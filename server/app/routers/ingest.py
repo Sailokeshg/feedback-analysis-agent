@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from ..services.database import get_db
 from ..repositories import FeedbackRepository
-from ..jobs import enqueue_feedback_batch_processing
+from ..jobs import enqueue_feedback_ingestion
 from ..config import settings
 
 router = APIRouter()
@@ -25,6 +25,7 @@ class IngestResponse(BaseModel):
     created_count: int
     duplicate_count: int
     error_count: int
+    skipped_non_english_count: int = 0
     job_id: Optional[str] = None
 
 @router.post("/feedback")
@@ -213,7 +214,7 @@ async def ingest_feedback_data(
         if process_async and batch_result["created"]:
             feedback_ids = [item["id"] for item in batch_result["created"]]
             try:
-                job_id = enqueue_feedback_batch_processing(
+                job_id = enqueue_feedback_ingestion(
                     feedback_ids=feedback_ids,
                     batch_id=batch_id,
                     source=source
@@ -436,7 +437,7 @@ async def ingest_feedback_data(
         if process_async and batch_result["created"]:
             feedback_ids = [item["id"] for item in batch_result["created"]]
             try:
-                job_id = enqueue_feedback_batch_processing(
+                job_id = enqueue_feedback_ingestion(
                     feedback_ids=feedback_ids,
                     batch_id=batch_id,
                     source=source

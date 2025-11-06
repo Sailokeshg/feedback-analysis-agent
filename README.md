@@ -61,7 +61,7 @@ make format
 - 🧠 Topic clustering with sentence-transformers
 - 💬 Agentic Q&A for natural language queries
 - 📈 Interactive dashboard with charts
-- 🔄 Background processing with RQ workers
+- 🔄 Multi-queue background processing (ingest → annotate → cluster → reports)
 - 🐳 Local deployment with Docker
 
 ## Tech Stack
