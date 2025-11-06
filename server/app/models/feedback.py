@@ -1,19 +1,72 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text
+import sqlalchemy as sa
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, ARRAY, SmallInteger
+from sqlalchemy.dialects.postgresql import UUID, JSONB, TIMESTAMP
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
+import uuid
 from datetime import datetime
 
 Base = declarative_base()
 
-class FeedbackItem(Base):
-    __tablename__ = "feedback_items"
+# Check if pgvector is available, otherwise use bytea for embeddings
+try:
+    from pgvector.sqlalchemy import Vector
+    HAS_PGVECTOR = True
+except ImportError:
+    HAS_PGVECTOR = False
 
-    id = Column(String, primary_key=True, index=True)
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    source = Column(String, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, nullable=False)
+    customer_id = Column(String, nullable=True)
     text = Column(Text, nullable=False)
-    sentiment = Column(String, nullable=False)  # positive, negative, neutral
-    sentiment_score = Column(Float, nullable=False)
-    topic_cluster = Column(String, nullable=False)
-    source = Column(String, nullable=False)  # CSV upload, API, etc.
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    meta = Column(JSONB, nullable=False, default=dict)
+
+    # Relationship to NLP annotations
+    nlp_annotations = relationship("NLPAnnotation", back_populates="feedback", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<FeedbackItem(id={self.id}, sentiment={self.sentiment})>"
+        return f"<Feedback(id={self.id}, source={self.source})>"
+
+
+class NLPAnnotation(Base):
+    __tablename__ = "nlp_annotation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    feedback_id = Column(UUID(as_uuid=True), ForeignKey("feedback.id", ondelete="CASCADE"), nullable=False, index=True)
+    sentiment = Column(SmallInteger, nullable=False)  # -1, 0, 1 for negative, neutral, positive
+    sentiment_score = Column(Float, nullable=False)
+    topic_id = Column(Integer, ForeignKey("topic.id"), nullable=True, index=True)
+    toxicity_score = Column(Float, nullable=True)
+
+    # Embedding field - use pgvector if available, otherwise bytea
+    if HAS_PGVECTOR:
+        embedding = Column(Vector(384), nullable=True)  # Adjust dimension as needed
+    else:
+        embedding = Column(sa.LargeBinary, nullable=True)  # bytea fallback
+
+    # Relationships
+    feedback = relationship("Feedback", back_populates="nlp_annotations")
+    topic = relationship("Topic", back_populates="annotations")
+
+    def __repr__(self):
+        return f"<NLPAnnotation(id={self.id}, feedback_id={self.feedback_id}, sentiment={self.sentiment})>"
+
+
+class Topic(Base):
+    __tablename__ = "topic"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    label = Column(String, nullable=False, index=True)
+    keywords = Column(ARRAY(String), nullable=False, default=list)
+    updated_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationship to NLP annotations
+    annotations = relationship("NLPAnnotation", back_populates="topic")
+
+    def __repr__(self):
+        return f"<Topic(id={self.id}, label={self.label})>"
