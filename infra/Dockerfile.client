@@ -3,16 +3,17 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy package files
+COPY package*.json ./
 COPY client/package*.json ./client/
 
 # Install dependencies
-RUN cd client && npm ci
+RUN npm ci
 
 # Copy client source
 COPY client/ ./client/
 
 # Build the client
-RUN cd client && npm run build
+RUN npm run build --workspace=client
 
 # Install serve to serve the built app
 RUN npm install -g serve

@@ -34,7 +34,7 @@ const Dashboard = () => {
                 fill="#8884d8"
                 dataKey="value"
               >
-                {sentimentData.map((entry, index) => (
+                {sentimentData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
