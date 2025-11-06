@@ -70,3 +70,25 @@ class Topic(Base):
 
     def __repr__(self):
         return f"<Topic(id={self.id}, label={self.label})>"
+
+
+class TopicAuditLog(Base):
+    __tablename__ = "topic_audit_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    topic_id = Column(Integer, ForeignKey("topic.id"), nullable=False, index=True)
+    action = Column(String, nullable=False)  # 'create', 'update', 'delete'
+    old_label = Column(String, nullable=True)
+    new_label = Column(String, nullable=True)
+    old_keywords = Column(ARRAY(String), nullable=True)
+    new_keywords = Column(ARRAY(String), nullable=True)
+    changed_by = Column(String, nullable=False)  # User identifier
+    changed_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, nullable=False)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+
+    # Relationship to topic
+    topic = relationship("Topic")
+
+    def __repr__(self):
+        return f"<TopicAuditLog(id={self.id}, topic_id={self.topic_id}, action={self.action})>"

@@ -26,7 +26,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `GET /analytics/sentiment-trends` - Sentiment trends over time
 - `GET /analytics/volume-trends` - Feedback volume trends
 - `GET /analytics/daily-aggregates` - Daily statistics
-- `GET /analytics/topics` - Topic distribution
+- `GET /analytics/summary` - Analytics summary with totals and trends
+- `GET /analytics/topics` - Topic analytics with trends
+- `GET /analytics/examples` - Sample feedback comments
 - `GET /analytics/customers` - Customer statistics
 - `GET /analytics/sources` - Source statistics
 - `GET /analytics/toxicity` - Toxicity analysis
@@ -38,13 +40,17 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `POST /chat/feedback/{id}/clarify` - Clarify specific feedback
 - `GET /chat/suggestions` - Query suggestions
 
-#### `/admin` - Administrative Operations
+#### `/admin` - Administrative Operations (Requires JWT Authentication)
+- `POST /admin/login` - Admin authentication (returns JWT token)
 - `GET /admin/stats` - System statistics
 - `POST /admin/maintenance/refresh-materialized-view` - Refresh analytics view
 - `GET /admin/health/database` - Database health check
 - `GET /admin/config` - Configuration info
 - `POST /admin/cleanup/old-data` - Data cleanup
 - `GET /admin/logs/recent` - Recent logs
+- `POST /admin/relabel-topic` - Update topic label and keywords
+- `GET /admin/topic-audit/{topic_id}` - Get audit history for specific topic
+- `GET /admin/topic-audit` - Get recent audit logs across all topics
 - `POST /admin/cache/clear` - Clear caches
 
 ## 🔧 Configuration

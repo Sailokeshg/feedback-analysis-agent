@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 
 from ..services.database import SessionLocal
+from ..services.cache_service import cache_service
 from ..repositories import FeedbackRepository
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,11 @@ def process_feedback_batch(
             "failed": failed,
             "timestamp": datetime.utcnow().isoformat()
         }
+
+        # Invalidate analytics cache after successful processing
+        if len(processed) > 0:
+            invalidated_keys = cache_service.invalidate_analytics_cache()
+            logger.info(f"Invalidated {invalidated_keys} analytics cache keys after batch processing")
 
         logger.info(f"Completed batch processing for batch {batch_id}: {len(processed)} processed, {len(failed)} failed")
         return result

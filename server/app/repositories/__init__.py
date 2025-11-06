@@ -12,6 +12,7 @@ from .base import (
 )
 from .feedback import FeedbackRepository
 from .analytics import AnalyticsRepository
+from .topic import TopicRepository
 
 __all__ = [
     "BaseRepository",
@@ -20,5 +21,6 @@ __all__ = [
     "RetryConfig",
     "retry_with_backoff",
     "FeedbackRepository",
-    "AnalyticsRepository"
+    "AnalyticsRepository",
+    "TopicRepository"
 ]
