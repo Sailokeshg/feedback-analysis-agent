@@ -147,3 +147,4 @@ def enqueue_report_generation(
         logger.warning("Failed to enqueue reports job, falling back to sync processing")
         # Fallback: process synchronously
         return generate_feedback_reports(feedback_ids, batch_id, source).get("batch_id", "sync-fallback")
+

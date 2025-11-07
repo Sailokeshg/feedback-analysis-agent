@@ -102,3 +102,4 @@ class TestQueueService:
 def test_func():
     """Test function for job enqueuing."""
     return "test"
+
