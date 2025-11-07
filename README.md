@@ -112,6 +112,15 @@ curl -o analytics.csv "http://localhost:8000/api/export/analytics.csv"
 
 📖 **[Complete Backup & Export Guide](./docs/backup_and_export.md)**
 
+### Admin Topic Management
+```bash
+# Admin login (top navigation)
+# Manage topics: edit labels/keywords, reassign feedback
+# All changes audited and reflected in analytics instantly
+```
+
+📖 **[Admin Topic Management Guide](./docs/admin_topic_management.md)**
+
 ## 📋 Environment Variables
 
 ### Database Configuration

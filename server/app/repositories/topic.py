@@ -9,6 +9,9 @@ from sqlalchemy import and_
 
 from .base import BaseRepository
 from ..models import Topic, TopicAuditLog
+from ..logging import get_logger
+
+logger = get_logger("topic_repository")
 
 
 class TopicRepository(BaseRepository[Topic]):
@@ -196,3 +199,85 @@ class TopicRepository(BaseRepository[Topic]):
             topics.append(topic)
 
         return topics
+
+    def reassign_feedback_to_topic(
+        self,
+        feedback_id: str,
+        new_topic_id: int,
+        changed_by: str,
+        reason: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Reassign feedback comment to a different topic with audit logging.
+
+        Args:
+            feedback_id: UUID of the feedback to reassign
+            new_topic_id: ID of the new topic
+            changed_by: User identifier making the change
+            reason: Optional reason for reassignment
+            ip_address: IP address of the user
+            user_agent: User agent string
+
+        Returns:
+            Dict with reassignment details
+
+        Raises:
+            ValueError: If feedback or topic not found
+        """
+        from ..models import NLPAnnotation
+
+        # Verify new topic exists
+        new_topic = self.get_topic_by_id(new_topic_id)
+        if not new_topic:
+            raise ValueError(f"Topic with ID {new_topic_id} not found")
+
+        # Get current annotation for this feedback
+        annotation = (
+            self.session.query(NLPAnnotation)
+            .filter(NLPAnnotation.feedback_id == feedback_id)
+            .first()
+        )
+
+        if not annotation:
+            raise ValueError(f"No annotation found for feedback {feedback_id}")
+
+        # Store old topic info
+        old_topic_id = annotation.topic_id
+        old_topic_label = None
+        if old_topic_id:
+            old_topic = self.get_topic_by_id(old_topic_id)
+            old_topic_label = old_topic.label if old_topic else None
+
+        # Update annotation
+        annotation.topic_id = new_topic_id
+
+        # Create audit log entry for the reassignment
+        audit_log = TopicAuditLog(
+            topic_id=new_topic_id,
+            action="reassign_feedback",
+            changed_by=changed_by,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+        # Add metadata about the reassignment
+        audit_log.old_label = f"Feedback {feedback_id} reassigned"
+        audit_log.new_label = f"From topic {old_topic_id} ({old_topic_label}) to topic {new_topic_id} ({new_topic.label})"
+        if reason:
+            audit_log.new_label += f" - Reason: {reason}"
+
+        self.session.add(audit_log)
+        self.session.commit()
+
+        return {
+            "feedback_id": feedback_id,
+            "old_topic_id": old_topic_id,
+            "new_topic_id": new_topic_id,
+            "old_topic_label": old_topic_label,
+            "new_topic_label": new_topic.label,
+            "reason": reason,
+            "reassigned_by": changed_by,
+            "reassigned_at": audit_log.changed_at.isoformat()
+        }

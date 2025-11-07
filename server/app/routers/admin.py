@@ -12,6 +12,9 @@ from ..services.database import get_db
 from ..services.auth_service import get_admin_user, get_viewer_user
 from ..repositories import AnalyticsRepository, TopicRepository
 from ..config import settings
+from ..logging import get_logger
+
+logger = get_logger("admin_api")
 
 router = APIRouter()
 
@@ -186,6 +189,33 @@ async def cleanup_old_data(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to cleanup old data: {str(e)}")
 
+@router.get("/topics")
+async def get_all_topics(db: Session = Depends(get_db)):
+    """Get all topics for admin management."""
+    try:
+        from ..repositories import TopicRepository
+
+        repo = TopicRepository(db)
+        # This would need to be implemented in TopicRepository
+        # For now, we'll use a simple query
+        from ..models import Topic
+        topics = db.query(Topic).order_by(Topic.label).all()
+
+        return [
+            {
+                "id": topic.id,
+                "label": topic.label,
+                "keywords": topic.keywords,
+                "updated_at": topic.updated_at.isoformat(),
+            }
+            for topic in topics
+        ]
+
+    except Exception as e:
+        logger.error(f"Failed to get topics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get topics: {str(e)}")
+
+
 @router.get("/logs/recent")
 async def get_recent_logs(lines: int = 50):
     """Get recent application logs (placeholder)"""
@@ -257,6 +287,25 @@ class TopicAuditLogResponse(BaseModel):
     changed_at: str
     ip_address: Optional[str]
     user_agent: Optional[str]
+
+
+class ReassignFeedbackRequest(BaseModel):
+    """Request model for reassigning feedback to a different topic."""
+    feedback_id: str  # UUID as string
+    new_topic_id: int
+    reason: Optional[str] = None
+
+
+class ReassignFeedbackResponse(BaseModel):
+    """Response model for feedback reassignment."""
+    feedback_id: str
+    old_topic_id: Optional[int]
+    new_topic_id: int
+    old_topic_label: Optional[str]
+    new_topic_label: str
+    reason: Optional[str]
+    reassigned_at: str
+    reassigned_by: str
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -385,6 +434,93 @@ async def get_recent_topic_audit_logs(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit logs: {str(e)}")
+
+
+@router.post("/reassign-feedback", response_model=ReassignFeedbackResponse)
+async def reassign_feedback(
+    request: ReassignFeedbackRequest,
+    req: Request,
+    current_user: Dict[str, Any] = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Reassign a feedback comment to a different topic. Requires admin authentication."""
+    try:
+        from ..repositories import TopicRepository
+
+        repo = TopicRepository(db)
+
+        # Reassign feedback with audit logging
+        result = repo.reassign_feedback_to_topic(
+            feedback_id=request.feedback_id,
+            new_topic_id=request.new_topic_id,
+            changed_by=current_user.get("sub", "unknown"),
+            reason=request.reason,
+            ip_address=current_user.get("ip_address"),
+            user_agent=current_user.get("user_agent")
+        )
+
+        # Refresh materialized view after reassignment
+        try:
+            from ..repositories import BaseRepository
+            base_repo = BaseRepository(db)
+            base_repo.execute_query("REFRESH MATERIALIZED VIEW daily_feedback_aggregates", fetch="none")
+            logger.info("Refreshed materialized view after feedback reassignment")
+        except Exception as e:
+            logger.warning(f"Failed to refresh materialized view: {e}")
+
+        return ReassignFeedbackResponse(**result)
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to reassign feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reassign feedback: {str(e)}")
+
+
+@router.get("/topics/{topic_id}/feedback")
+async def get_topic_feedback(
+    topic_id: int,
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    current_user: Dict[str, Any] = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Get feedback comments assigned to a specific topic. Requires admin authentication."""
+    try:
+        from ..repositories import AnalyticsRepository
+
+        repo = AnalyticsRepository(db)
+
+        # Get feedback examples for this topic
+        examples = repo.get_feedback_examples(
+            topic_id=topic_id,
+            limit=page_size * page  # Get enough for pagination
+        )
+
+        # Manual pagination (since the repo method doesn't support offset)
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_examples = examples[start_idx:end_idx] if examples else []
+
+        # Get total count
+        total_count = len(examples) if examples else 0
+        total_pages = (total_count + page_size - 1) // page_size
+
+        return {
+            "topic_id": topic_id,
+            "feedback": paginated_examples,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get topic feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get topic feedback: {str(e)}")
 
 
 # Viewer endpoints (accessible by both admin and viewer roles)

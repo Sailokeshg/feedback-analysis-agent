@@ -9,6 +9,7 @@ const Dashboard = lazy(() => import('./components/Dashboard'));
 const TopicsPage = lazy(() => import('./pages/TopicsPage'));
 const TopicDetail = lazy(() => import('./pages/TopicDetail'));
 const ExplorerPage = lazy(() => import('./pages/ExplorerPage'));
+const AdminTopicsPage = lazy(() => import('./pages/AdminTopicsPage'));
 
 // Loading component for suspense fallback
 const PageLoading = () => (
@@ -41,6 +42,7 @@ function App() {
           <Route path="/topics" element={<TopicsPage />} />
           <Route path="/topics/:topicId" element={<TopicDetail />} />
           <Route path="/explorer" element={<ExplorerPage />} />
+          <Route path="/admin/topics" element={<AdminTopicsPage />} />
         </Routes>
       </Suspense>
     </Layout>
