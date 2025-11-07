@@ -1,15 +1,24 @@
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query
+import time
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from ..services.database import get_db
 from ..repositories import FeedbackRepository, PaginationParams, DateFilter
+from ..logging import get_logger, request_id
+from ..metrics import (
+    increment_http_requests,
+    observe_http_request_duration,
+    increment_feedback_processed,
+)
 
 router = APIRouter()
+log = get_logger("feedback_api")
 
 @router.get("/feedback", response_model=dict)
 async def get_feedback(
+    request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
     source: Optional[str] = Query(None, description="Filter by source"),
@@ -19,6 +28,24 @@ async def get_feedback(
     db: Session = Depends(get_db)
 ):
     """Get paginated feedback items with filtering"""
+    start_time = time.time()
+    request_id_val = request_id.get() or "unknown"
+
+    log.info(
+        "Fetching feedback list",
+        extra={
+            "request_id": request_id_val,
+            "page": page,
+            "page_size": page_size,
+            "source_filter": source,
+            "customer_id_filter": customer_id,
+            "date_filter": {
+                "start_date": start_date,
+                "end_date": end_date
+            } if start_date or end_date else None,
+        }
+    )
+
     try:
         repo = FeedbackRepository(db)
 
@@ -37,11 +64,47 @@ async def get_feedback(
             customer_id_filter=customer_id
         )
 
+        duration = time.time() - start_time
+        observe_http_request_duration("GET", "/api/feedback", duration)
+
+        log.info(
+            "Feedback list retrieved successfully",
+            extra={
+                "request_id": request_id_val,
+                "total_items": result.get("total", 0),
+                "returned_items": len(result.get("items", [])),
+                "duration_ms": round(duration * 1000, 2),
+            }
+        )
+
         return result
 
     except ValueError as e:
+        duration = time.time() - start_time
+        increment_http_requests("GET", "/api/feedback", 400)
+
+        log.warning(
+            "Invalid parameters for feedback list",
+            extra={
+                "request_id": request_id_val,
+                "error": str(e),
+                "duration_ms": round(duration * 1000, 2),
+            }
+        )
         raise HTTPException(status_code=400, detail=f"Invalid parameters: {str(e)}")
     except Exception as e:
+        duration = time.time() - start_time
+        increment_http_requests("GET", "/api/feedback", 500)
+
+        log.error(
+            "Failed to fetch feedback list",
+            extra={
+                "request_id": request_id_val,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "duration_ms": round(duration * 1000, 2),
+            }
+        )
         raise HTTPException(status_code=500, detail=f"Failed to fetch feedback: {str(e)}")
 
 @router.get("/feedback/{feedback_id}")
@@ -71,6 +134,7 @@ async def get_feedback_item(feedback_id: str, db: Session = Depends(get_db)):
 
 @router.post("/feedback")
 async def create_feedback(
+    request: Request,
     source: str,
     text: str,
     customer_id: Optional[str] = None,
@@ -78,6 +142,20 @@ async def create_feedback(
     db: Session = Depends(get_db)
 ):
     """Create a new feedback item"""
+    start_time = time.time()
+    request_id_val = request_id.get() or "unknown"
+
+    log.info(
+        "Creating new feedback item",
+        extra={
+            "request_id": request_id_val,
+            "source": source,
+            "text_length": len(text),
+            "customer_id": customer_id,
+            "has_meta": meta is not None,
+        }
+    )
+
     try:
         repo = FeedbackRepository(db)
 
@@ -86,6 +164,21 @@ async def create_feedback(
             text=text,
             customer_id=customer_id,
             meta=meta or {}
+        )
+
+        duration = time.time() - start_time
+        increment_http_requests("POST", "/api/feedback", 201)
+        observe_http_request_duration("POST", "/api/feedback", duration)
+        increment_feedback_processed(source, "created")
+
+        log.info(
+            "Feedback item created successfully",
+            extra={
+                "request_id": request_id_val,
+                "feedback_id": str(feedback.id),
+                "source": source,
+                "duration_ms": round(duration * 1000, 2),
+            }
         )
 
         return {
@@ -98,6 +191,19 @@ async def create_feedback(
         }
 
     except Exception as e:
+        duration = time.time() - start_time
+        increment_http_requests("POST", "/api/feedback", 500)
+
+        log.error(
+            "Failed to create feedback item",
+            extra={
+                "request_id": request_id_val,
+                "source": source,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "duration_ms": round(duration * 1000, 2),
+            }
+        )
         raise HTTPException(status_code=500, detail=f"Failed to create feedback: {str(e)}")
 
 @router.get("/feedback/search")

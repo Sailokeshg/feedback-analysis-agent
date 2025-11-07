@@ -1,0 +1,11 @@
+source,text,customer_id,created_at,user_agent,ip_address
+website,"Amazing product! The new dashboard is incredibly intuitive and saves me so much time.",customer_001,2024-01-15T10:30:00Z,"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",192.168.1.100
+mobile_app,"The app keeps crashing when I try to upload photos. Very frustrating experience.",customer_002,2024-01-15T11:45:00Z,"iPhone App v2.1.0",10.0.0.50
+support_ticket,"Your customer support team was incredibly helpful and resolved my issue within minutes. Thank you!",customer_003,2024-01-15T14:20:00Z,"Zendesk Widget",203.0.113.1
+survey,"The interface is confusing and not user-friendly. I had to ask for help multiple times.",customer_004,2024-01-15T16:10:00Z,"SurveyMonkey/1.0",198.51.100.15
+social_media,"Great value for money! The premium features are worth every penny.",customer_005,2024-01-15T18:30:00Z,"Twitter/1.0",104.244.42.1
+website,"Loading times are extremely slow. The page takes forever to load even on fast internet.",customer_006,2024-01-16T09:15:00Z,"Chrome/120.0.0.0",172.16.0.25
+mobile_app,"Love the new notification system! It keeps me updated without being overwhelming.",customer_007,2024-01-16T12:00:00Z,"Android App v2.1.0",192.168.1.200
+support_ticket,"The documentation is outdated and doesn't match the current version of the software.",customer_008,2024-01-16T15:45:00Z,"Help Center Widget",10.10.10.10
+survey,"Excellent customer service response time. My issue was resolved quickly and professionally.",customer_009,2024-01-16T17:20:00Z,"Typeform/1.0",8.8.8.8
+social_media,"The search functionality is broken. I can't find anything in my account history.",customer_010,2024-01-16T19:30:00Z,"Facebook App/400.0",157.240.0.1

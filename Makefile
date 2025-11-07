@@ -1,6 +1,6 @@
 # AI Customer Insights Agent - Development Makefile
 
-.PHONY: help dev build test lint format clean bootstrap docker-up docker-down
+.PHONY: help dev build test test-server test-worker test-client demo-logging test-logging lint format clean bootstrap docker-up docker-down
 
 help: ## Show this help message
 	@echo "Available commands:"
@@ -30,11 +30,28 @@ dev: ## Start development servers
 build: ## Build all services
 	docker-compose -f infra/docker-compose.yml build
 
-test: ## Run tests
-	@echo "Running server tests..."
-	cd server && python -m pytest tests/ -v
-	@echo "Running client tests..."
-	cd client && npm test
+test: ## Run all tests with coverage
+	@echo "Running server tests with coverage..."
+	cd server && python -m pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+	@echo "Running worker tests with coverage..."
+	cd worker && python -m pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+	@echo "Running client tests with coverage..."
+	cd client && npm run test:coverage
+
+test-server: ## Run server tests only
+	cd server && python -m pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+
+test-worker: ## Run worker tests only
+	cd worker && python -m pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+
+test-client: ## Run client tests only
+	cd client && npm run test:coverage
+
+demo-logging: ## Run logging and metrics demonstration
+	cd server && python demo_logging_metrics.py
+
+test-logging: ## Run logging and metrics integration tests
+	cd server && python test_logging_metrics.py
 
 lint: ## Run linting
 	@echo "Linting Python code..."
