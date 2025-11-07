@@ -9,7 +9,7 @@ from fastapi import Request
 from pydantic import BaseModel
 
 from ..services.database import get_db
-from ..services.auth_service import get_admin_user
+from ..services.auth_service import get_admin_user, get_viewer_user
 from ..repositories import AnalyticsRepository, TopicRepository
 from ..config import settings
 
@@ -262,26 +262,47 @@ class TopicAuditLogResponse(BaseModel):
 @router.post("/login", response_model=LoginResponse)
 async def admin_login(request: LoginRequest):
     """Authenticate admin user and return JWT token."""
-    # Simple authentication for demo purposes
-    # In production, you'd validate against a user database with proper password hashing
-    if request.username == "admin" and request.password == "admin123":
-        from ..services.auth_service import auth_service
+    from ..services.auth_service import auth_service
 
-        # Create token with user info
-        token_data = {
-            "sub": request.username,
-            "is_admin": True,
-            "role": "admin"
-        }
-        access_token = auth_service.create_access_token(token_data)
-
-        return LoginResponse(
-            access_token=access_token,
-            token_type="bearer",
-            expires_in=settings.security.access_token_expire_minutes * 60
-        )
-    else:
+    user = auth_service.authenticate_user(request.username, request.password)
+    if not user or user["role"] != "admin":
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Create token with user info
+    token_data = {
+        "sub": user["username"],
+        "role": user["role"]
+    }
+    access_token = auth_service.create_access_token(token_data)
+
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=settings.security.access_token_expire_minutes * 60
+    )
+
+
+@router.post("/viewer/login", response_model=LoginResponse)
+async def viewer_login(request: LoginRequest):
+    """Authenticate viewer user and return JWT token."""
+    from ..services.auth_service import auth_service
+
+    user = auth_service.authenticate_user(request.username, request.password)
+    if not user or user["role"] != "viewer":
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Create token with user info
+    token_data = {
+        "sub": user["username"],
+        "role": user["role"]
+    }
+    access_token = auth_service.create_access_token(token_data)
+
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=settings.security.access_token_expire_minutes * 60
+    )
 
 
 @router.post("/relabel-topic", response_model=RelabelTopicResponse)
@@ -364,3 +385,68 @@ async def get_recent_topic_audit_logs(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit logs: {str(e)}")
+
+
+# Viewer endpoints (accessible by both admin and viewer roles)
+@router.get("/viewer/stats")
+async def get_viewer_stats(db: Session = Depends(get_db), current_user: Dict[str, Any] = Depends(get_viewer_user)):
+    """Get basic system statistics for viewers."""
+    try:
+        repo = AnalyticsRepository(db)
+
+        # Get basic feedback stats
+        total_feedback = repo.execute_query(
+            "SELECT COUNT(*) FROM feedback",
+            fetch="scalar"
+        )
+
+        # Get feedback from last 30 days
+        recent_feedback = repo.execute_query(
+            "SELECT COUNT(*) FROM feedback WHERE created_at >= NOW() - INTERVAL '30 days'",
+            fetch="scalar"
+        )
+
+        return {
+            "total_feedback": total_feedback,
+            "recent_feedback_30d": recent_feedback,
+            "user_role": current_user.get("role"),
+            "username": current_user.get("sub")
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch viewer stats: {str(e)}")
+
+
+@router.get("/viewer/dashboard")
+async def get_viewer_dashboard(db: Session = Depends(get_db), current_user: Dict[str, Any] = Depends(get_viewer_user)):
+    """Get dashboard data for viewers."""
+    try:
+        repo = AnalyticsRepository(db)
+
+        # Get basic topic distribution
+        topics = repo.get_topic_distribution(limit=10)
+
+        # Get recent sentiment trends
+        sentiment_trends = repo.get_sentiment_trends(group_by="day", limit=7)
+
+        return {
+            "topics": topics,
+            "sentiment_trends": sentiment_trends,
+            "user_role": current_user.get("role"),
+            "last_updated": "2024-11-07T12:00:00Z"  # Mock timestamp
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch dashboard data: {str(e)}")
+
+
+@router.get("/viewer/profile")
+async def get_viewer_profile(current_user: Dict[str, Any] = Depends(get_viewer_user)):
+    """Get current user profile information."""
+    return {
+        "username": current_user.get("sub"),
+        "role": current_user.get("role"),
+        "permissions": ["read:stats", "read:dashboard"] if current_user.get("role") == "viewer" else ["read:stats", "read:dashboard", "write:topics", "admin:system"],
+        "login_time": current_user.get("iat"),
+        "expires_at": current_user.get("exp")
+    }

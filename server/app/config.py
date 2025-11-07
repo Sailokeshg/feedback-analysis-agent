@@ -58,8 +58,17 @@ class RateLimitSettings(BaseSettings):
 
 class SecuritySettings(BaseSettings):
     """Security configuration."""
+    # JWT Configuration
     secret_key: str = Field(default="your-secret-key-change-in-production")
+    secret_key_rotation: str = Field(default="", description="Secondary secret key for rotation")
     access_token_expire_minutes: int = Field(default=30, gt=0)
+    refresh_token_expire_days: int = Field(default=7, gt=0)
+
+    # User Credentials (for development/demo only)
+    admin_username: str = Field(default="admin")
+    admin_password: str = Field(default="admin123")
+    viewer_username: str = Field(default="viewer")
+    viewer_password: str = Field(default="viewer123")
 
     class Config:
         env_prefix = "SECURITY_"

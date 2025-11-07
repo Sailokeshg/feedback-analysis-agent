@@ -359,3 +359,214 @@ class TestAuthService:
 
         with pytest.raises(Exception):  # Should raise expired error
             auth_service.verify_token(token)
+
+
+class TestRoleBasedAuthentication:
+    """Test role-based authentication with JWT."""
+
+    def test_admin_login_success(self, client):
+        """Test successful admin login."""
+        response = client.post(
+            "/admin/login",
+            json={"username": "admin", "password": "admin123"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+        assert data["expires_in"] > 0
+
+    def test_viewer_login_success(self, client):
+        """Test successful viewer login."""
+        response = client.post(
+            "/admin/viewer/login",
+            json={"username": "viewer", "password": "viewer123"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+
+    def test_admin_login_invalid_credentials(self, client):
+        """Test admin login with invalid credentials."""
+        response = client.post(
+            "/admin/login",
+            json={"username": "admin", "password": "wrong"}
+        )
+
+        assert response.status_code == 401
+        assert "Invalid credentials" in response.json()["detail"]
+
+    def test_viewer_login_invalid_credentials(self, client):
+        """Test viewer login with invalid credentials."""
+        response = client.post(
+            "/admin/viewer/login",
+            json={"username": "viewer", "password": "wrong"}
+        )
+
+        assert response.status_code == 401
+        assert "Invalid credentials" in response.json()["detail"]
+
+    def test_admin_login_wrong_role(self, client):
+        """Test admin login with viewer credentials."""
+        response = client.post(
+            "/admin/login",
+            json={"username": "viewer", "password": "viewer123"}
+        )
+
+        assert response.status_code == 401
+        assert "Invalid credentials" in response.json()["detail"]
+
+
+class TestRoleBasedAccessControl:
+    """Test role-based access control for protected endpoints."""
+
+    @pytest.fixture
+    def admin_token(self, client):
+        """Get admin JWT token."""
+        response = client.post(
+            "/admin/login",
+            json={"username": "admin", "password": "admin123"}
+        )
+        return response.json()["access_token"]
+
+    @pytest.fixture
+    def viewer_token(self, client):
+        """Get viewer JWT token."""
+        response = client.post(
+            "/admin/viewer/login",
+            json={"username": "viewer", "password": "viewer123"}
+        )
+        return response.json()["access_token"]
+
+    def test_admin_endpoints_require_authentication(self, client):
+        """Test that admin endpoints block unauthorized access."""
+        admin_endpoints = [
+            "/admin/stats",
+            "/admin/relabel-topic",
+            "/admin/topic-audit/1",
+            "/admin/topic-audit",
+            "/admin/maintenance/refresh-materialized-view",
+            "/admin/health/database",
+            "/admin/config",
+            "/admin/cleanup/old-data",
+            "/admin/logs/recent",
+            "/admin/cache/clear"
+        ]
+
+        for endpoint in admin_endpoints:
+            response = client.get(endpoint)
+            assert response.status_code == 401, f"Endpoint {endpoint} should require authentication"
+
+    def test_viewer_endpoints_require_authentication(self, client):
+        """Test that viewer endpoints block unauthorized access."""
+        viewer_endpoints = [
+            "/admin/viewer/stats",
+            "/admin/viewer/dashboard",
+            "/admin/viewer/profile"
+        ]
+
+        for endpoint in viewer_endpoints:
+            response = client.get(endpoint)
+            assert response.status_code == 401, f"Endpoint {endpoint} should require authentication"
+
+    def test_viewer_can_access_viewer_endpoints(self, client, viewer_token):
+        """Test that viewers can access viewer endpoints."""
+        headers = {"Authorization": f"Bearer {viewer_token}"}
+
+        # Test viewer stats
+        response = client.get("/admin/viewer/stats", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert "total_feedback" in data
+        assert data["user_role"] == "viewer"
+
+        # Test viewer dashboard
+        response = client.get("/admin/viewer/dashboard", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert "topics" in data
+        assert "sentiment_trends" in data
+
+        # Test viewer profile
+        response = client.get("/admin/viewer/profile", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["role"] == "viewer"
+        assert "read:stats" in data["permissions"]
+
+    def test_admin_can_access_all_endpoints(self, client, admin_token):
+        """Test that admins can access all endpoints."""
+        headers = {"Authorization": f"Bearer {admin_token}"}
+
+        # Test admin can access viewer endpoints
+        response = client.get("/admin/viewer/stats", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user_role"] == "admin"
+
+        # Test admin profile shows admin permissions
+        response = client.get("/admin/viewer/profile", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["role"] == "admin"
+        assert "admin:system" in data["permissions"]
+
+        # Test admin can access admin-only endpoints
+        response = client.get("/admin/stats", headers=headers)
+        assert response.status_code == 200
+
+    def test_viewer_cannot_access_admin_endpoints(self, client, viewer_token):
+        """Test that viewers cannot access admin-only endpoints."""
+        headers = {"Authorization": f"Bearer {viewer_token}"}
+
+        admin_endpoints = [
+            "/admin/stats",
+            "/admin/relabel-topic",
+            "/admin/topic-audit/1",
+            "/admin/topic-audit",
+            "/admin/maintenance/refresh-materialized-view",
+            "/admin/health/database",
+            "/admin/config",
+            "/admin/cleanup/old-data",
+            "/admin/logs/recent",
+            "/admin/cache/clear"
+        ]
+
+        for endpoint in admin_endpoints:
+            response = client.get(endpoint, headers=headers)
+            assert response.status_code == 403, f"Viewer should not access admin endpoint {endpoint}"
+            assert "Admin privileges required" in response.json()["detail"]
+
+    def test_invalid_token_rejected(self, client):
+        """Test that invalid tokens are rejected."""
+        headers = {"Authorization": "Bearer invalid.token.here"}
+
+        response = client.get("/admin/viewer/stats", headers=headers)
+        assert response.status_code == 401
+
+    def test_expired_token_rejected(self, client):
+        """Test that expired tokens are rejected."""
+        # Create an expired token
+        import time
+        expired_token_data = {
+            "sub": "viewer",
+            "role": "viewer",
+            "exp": int(time.time()) - 3600  # Expired 1 hour ago
+        }
+        expired_token = auth_service.create_access_token(expired_token_data)
+
+        headers = {"Authorization": f"Bearer {expired_token}"}
+        response = client.get("/admin/viewer/stats", headers=headers)
+        assert response.status_code == 401
+        assert "Token has expired" in response.json()["detail"]
+
+    def test_malformed_token_rejected(self, client):
+        """Test that malformed tokens are rejected."""
+        headers = {"Authorization": "Bearer not-a-jwt-token"}
+
+        response = client.get("/admin/viewer/stats", headers=headers)
+        assert response.status_code == 401
+        assert "Invalid token" in response.json()["detail"]

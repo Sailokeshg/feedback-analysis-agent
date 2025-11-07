@@ -75,6 +75,43 @@ graph TB
 - **Worker**: RQ-based background processing for heavy ML tasks
 - **Infrastructure**: Docker Compose with PostgreSQL, Redis, and Chroma
 
+## 🔄 Backup & Export
+
+### Automated Nightly Backups
+```bash
+# Schedule nightly PostgreSQL backups
+0 2 * * * /path/to/server/scripts/nightly_backup.sh
+
+# Environment variables
+BACKUP_DIR=/var/backups/feedback-agent
+DATABASE_URL=postgresql://user:password@host:5432/db
+RETENTION_DAYS=30
+```
+
+### Database Restore
+```bash
+# List available backups
+./server/scripts/restore_backup.sh --list
+
+# Restore from backup
+./server/scripts/restore_backup.sh feedback_backup_20241107_020000.sql.gz
+```
+
+### CSV Data Export
+```bash
+# Export all feedback
+curl -o feedback.csv "http://localhost:8000/api/export.csv"
+
+# Export filtered feedback
+curl -o filtered.csv "http://localhost:8000/api/export.csv?source=website&start_date=2024-01-01"
+
+# Export topics and analytics
+curl -o topics.csv "http://localhost:8000/api/export/topics.csv"
+curl -o analytics.csv "http://localhost:8000/api/export/analytics.csv"
+```
+
+📖 **[Complete Backup & Export Guide](./docs/backup_and_export.md)**
+
 ## 📋 Environment Variables
 
 ### Database Configuration
