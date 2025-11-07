@@ -28,7 +28,11 @@ class RequestTimingMiddleware:
         start_time = time.time()
 
         # Set request context
-        set_request_context(request_id=request_id)
+        try:
+            set_request_context(request_id_val=request_id)
+        except Exception:
+            # Context setting failed, continue without it
+            pass
 
         # Create request object for logging
         request = Request(scope, receive)
@@ -65,7 +69,11 @@ class RequestTimingMiddleware:
             raise
         finally:
             # Clear request context
-            clear_request_context()
+            try:
+                clear_request_context()
+            except Exception:
+                # Context clearing failed, continue
+                pass
 
     @staticmethod
     def _get_client_ip(request: Request) -> str:

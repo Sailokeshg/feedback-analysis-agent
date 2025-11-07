@@ -6,7 +6,7 @@ from .ingest import router as ingest_router
 from .analytics import router as analytics_router
 from .chat import router as chat_router
 from .admin import router as admin_router
-from .export import router as export_router
+from ..api.export import router as export_router
 
 __all__ = [
     "ingest_router",

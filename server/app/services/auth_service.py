@@ -2,7 +2,7 @@
 JWT authentication service with role-based access control for admin and viewer endpoints.
 """
 
-import jwt
+from jose import jwt
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Literal
 from fastapi import HTTPException, Depends, Request
@@ -27,22 +27,27 @@ class AuthService:
         self.secret_key_rotation = settings.security.secret_key_rotation or self.secret_key
         self.algorithm = "HS256"
         self.access_token_expire_minutes = settings.security.access_token_expire_minutes
+        self._users = None  # Lazy-loaded users
 
-        # User credentials (for development/demo only)
-        self.users = {
-            settings.security.admin_username: {
-                "username": settings.security.admin_username,
-                "password": self.hash_password(settings.security.admin_password),
-                "role": "admin",
-                "disabled": False
-            },
-            settings.security.viewer_username: {
-                "username": settings.security.viewer_username,
-                "password": self.hash_password(settings.security.viewer_password),
-                "role": "viewer",
-                "disabled": False
+    @property
+    def users(self):
+        """Lazy-load users to avoid bcrypt initialization issues during import."""
+        if self._users is None:
+            self._users = {
+                settings.security.admin_username: {
+                    "username": settings.security.admin_username,
+                    "password": self.hash_password(settings.security.admin_password),
+                    "role": "admin",
+                    "disabled": False
+                },
+                settings.security.viewer_username: {
+                    "username": settings.security.viewer_username,
+                    "password": self.hash_password(settings.security.viewer_password),
+                    "role": "viewer",
+                    "disabled": False
+                }
             }
-        }
+        return self._users
 
     def hash_password(self, password: str) -> str:
         """Hash a password for storing."""

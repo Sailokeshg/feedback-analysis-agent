@@ -21,6 +21,7 @@ echo "📦 Installing Python dependencies..."
 
 # Install server dependencies
 cd server
+source venv/bin/activate
 pip install -e .
 cd ..
 

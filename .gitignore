@@ -64,3 +64,5 @@ faiss_index/
 postgres_data/
 redis_data/
 chroma_data/
+
+**/venv/**
