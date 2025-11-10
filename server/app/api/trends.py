@@ -7,6 +7,37 @@ from ..repositories import AnalyticsRepository, DateFilter
 
 router = APIRouter()
 
+@router.get("/trends")
+async def get_trends(
+    group_by: str = Query("day", description="Time grouping (day, week, month)"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """Get sentiment trends over time (default endpoint for client)"""
+    try:
+        repo = AnalyticsRepository(db)
+
+        # Create date filter if provided
+        date_filter = DateFilter(
+            start_date=start_date,
+            end_date=end_date
+        ) if start_date or end_date else None
+
+
+        # Get sentiment trends
+        result = repo.get_sentiment_trends(
+            date_filter=date_filter,
+            group_by=group_by
+        )
+
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid parameters: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch trends: {str(e)}")
+
 @router.get("/trends/sentiment")
 async def get_sentiment_trends(
     group_by: str = Query("day", description="Time grouping (day, week, month)"),

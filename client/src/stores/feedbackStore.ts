@@ -40,7 +40,7 @@ export const useFeedbackStore = create<FeedbackStore>((set, get) => ({
         return;
       }
       const data = await response.json();
-      set({ feedbackItems: data });
+      set({ feedbackItems: data.items || [] });
     } catch (error) {
       set({ error: "Failed to fetch feedback" });
     } finally {

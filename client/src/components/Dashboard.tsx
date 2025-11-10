@@ -35,10 +35,13 @@ const Dashboard = () => {
     );
   }
 
+  // Ensure feedbackItems is an array
+  const safeFeedbackItems = Array.isArray(feedbackItems) ? feedbackItems : [];
+
   const sentimentData = [
-    { name: 'Positive', value: feedbackItems.filter(f => f.sentiment === 'positive').length },
-    { name: 'Negative', value: feedbackItems.filter(f => f.sentiment === 'negative').length },
-    { name: 'Neutral', value: feedbackItems.filter(f => f.sentiment === 'neutral').length },
+    { name: 'Positive', value: safeFeedbackItems.filter(f => f.sentiment === 'positive').length },
+    { name: 'Negative', value: safeFeedbackItems.filter(f => f.sentiment === 'negative').length },
+    { name: 'Neutral', value: safeFeedbackItems.filter(f => f.sentiment === 'neutral').length },
   ];
 
   const COLORS = ['#3b82f6', '#ef4444', '#6b7280'];
@@ -121,10 +124,10 @@ const Dashboard = () => {
       {/* Recent Feedback */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
-          Recent Feedback ({feedbackItems.length} items)
+          Recent Feedback ({safeFeedbackItems.length} items)
         </h3>
         <div className="max-h-[400px] overflow-y-auto space-y-3">
-          {feedbackItems.slice(0, 20).map((item) => (
+          {safeFeedbackItems.slice(0, 20).map((item) => (
             <div
               key={item.id}
               className="p-4 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
