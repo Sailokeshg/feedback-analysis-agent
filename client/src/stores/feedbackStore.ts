@@ -57,7 +57,20 @@ export const useFeedbackStore = create<FeedbackStore>((set, get) => ({
         return;
       }
       const data = await response.json();
-      set({ topicClusters: data });
+
+      // Transform API response to match TopicCluster interface
+      const transformedData = data.map((topic: any) => ({
+        id: topic.id.toString(),
+        name: topic.label,
+        count: topic.feedback_count,
+        sentiment_distribution: {
+          positive: topic.positive_count || 0,
+          negative: topic.negative_count || 0,
+          neutral: topic.neutral_count || 0,
+        }
+      }));
+
+      set({ topicClusters: transformedData });
     } catch (error) {
       set({ error: "Failed to fetch topics" });
     } finally {

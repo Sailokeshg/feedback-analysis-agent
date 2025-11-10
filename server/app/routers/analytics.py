@@ -306,24 +306,75 @@ async def get_feedback_examples(
         raise HTTPException(status_code=500, detail=f"Failed to fetch feedback examples: {str(e)}")
 
 @router.get("/dashboard/summary")
-async def get_dashboard_summary(db: Session = Depends(get_db)):
+async def get_dashboard_summary(
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
     """Get dashboard summary statistics"""
     try:
         repo = AnalyticsRepository(db)
 
-        # Get various stats for dashboard
-        total_feedback = repo.execute_query(
-            "SELECT COUNT(*) as count FROM feedback",
-            fetch="scalar"
-        )
+        # Create date filter if provided
+        date_filter = DateFilter(
+            start_date=start_date,
+            end_date=end_date
+        ) if start_date or end_date else None
 
-        recent_trends = repo.get_sentiment_trends(group_by="day", date_filter=None)
-        top_topics = repo.get_topic_distribution(min_feedback_count=5)
+        # Get comprehensive analytics summary
+        analytics_summary = repo.get_analytics_summary(date_filter=date_filter)
+
+        # Get topics count
+        topics_count = len(repo.get_topic_distribution(min_feedback_count=1, date_filter=date_filter))
+
+        # Get top negative topics (topics with negative sentiment > 50%)
+        negative_topics_query = """
+        SELECT
+            tc.name,
+            COUNT(f.id) as count,
+            ROUND(
+                (COUNT(CASE WHEN na.sentiment = -1 THEN 1 END)::float /
+                 NULLIF(COUNT(f.id), 0)) * 100, 1
+            ) as negative_percentage
+        FROM feedback f
+        JOIN topic_cluster tc ON f.topic_cluster_id = tc.id
+        LEFT JOIN nlp_annotation na ON f.id = na.feedback_id
+        """
+
+        params = {}
+        if date_filter:
+            date_condition = date_filter.to_sql_condition()
+            if date_condition:
+                negative_topics_query += f" WHERE {date_condition}"
+                params.update(date_filter.to_params())
+
+        negative_topics_query += """
+        GROUP BY tc.id, tc.name
+        HAVING COUNT(f.id) >= 5
+        ORDER BY negative_percentage DESC
+        LIMIT 10
+        """
+
+        top_negative_topics = repo.execute_query(negative_topics_query, params, fetch="all") or []
+
+        # Format trends for 14 days
+        daily_trend = analytics_summary.get('daily_trend', [])
+        trends_14d = [
+            {
+                'date': trend['date'],
+                'positive': trend['positive_count'],
+                'negative': trend['negative_count'],
+                'neutral': trend['neutral_count']
+            }
+            for trend in daily_trend[-14:]  # Last 14 days
+        ]
 
         return {
-            "total_feedback": total_feedback,
-            "recent_trends": recent_trends[-7:] if recent_trends else [],  # Last 7 days
-            "top_topics": top_topics[:10] if top_topics else []  # Top 10 topics
+            "total_feedback": analytics_summary.get('total_feedback', 0),
+            "negative_percentage": analytics_summary.get('negative_percentage', 0),
+            "topics_count": topics_count,
+            "trends_14d": trends_14d,
+            "top_negative_topics": top_negative_topics
         }
 
     except Exception as e:
