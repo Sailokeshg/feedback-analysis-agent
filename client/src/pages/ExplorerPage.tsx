@@ -50,12 +50,12 @@ const fetchExplorerResults = async (filters: ExplorerFilters, page: number = 1):
 };
 
 const fetchTopicsList = async (): Promise<string[]> => {
-  const response = await fetch(apiUrl('api/analytics/topics'));
+  const response = await fetch(apiUrl('analytics/topics'));
   if (!response.ok) {
     throw new Error('Failed to fetch topics');
   }
   const data = await response.json();
-  return data.map((topic: any) => topic.name);
+  return data.map((topic: any) => topic.label);
 };
 
 const ExplorerPage = () => {

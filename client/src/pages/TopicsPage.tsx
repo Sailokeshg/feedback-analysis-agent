@@ -5,16 +5,15 @@ import { apiUrl } from '../utils/api';
 import { ChevronUpIcon, ChevronDownIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 
 interface TopicAnalytics {
-  id: string;
-  name: string;
-  volume: number;
-  avg_sentiment: number;
-  week_over_week_delta: number;
-  trend: 'up' | 'down' | 'stable';
+  topic_id: number;
+  label: string;
+  count: number | null;
+  avg_sentiment: number | string | null;
+  delta_week: number | string | null;
 }
 
 const fetchTopicsAnalytics = async (): Promise<TopicAnalytics[]> => {
-  const response = await fetch(apiUrl('api/analytics/topics'));
+  const response = await fetch(apiUrl('analytics/topics'));
   if (!response.ok) {
     throw new Error('Failed to fetch topics analytics');
   }
@@ -22,7 +21,7 @@ const fetchTopicsAnalytics = async (): Promise<TopicAnalytics[]> => {
 };
 
 const TopicsPage = () => {
-  const [sortField, setSortField] = useState<keyof TopicAnalytics>('volume');
+  const [sortField, setSortField] = useState<keyof TopicAnalytics>('count');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const { data: topics, isLoading, error } = useQuery({
@@ -35,8 +34,15 @@ const TopicsPage = () => {
   const sortedTopics = useMemo(() => {
     if (!topics) return [];
     return [...topics].sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+
+      // Convert numeric fields to numbers for proper comparison
+      if (sortField === 'count' || sortField === 'avg_sentiment' || sortField === 'delta_week') {
+        aValue = Number(aValue) || 0;
+        bValue = Number(bValue) || 0;
+      }
+
       const direction = sortDirection === 'asc' ? 1 : -1;
       return (aValue < bValue ? -1 : aValue > bValue ? 1 : 0) * direction;
     });
@@ -114,11 +120,11 @@ const TopicsPage = () => {
                 <th
                   scope="col"
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => handleSort('name')}
+                  onClick={() => handleSort('label')}
                 >
                   <div className="flex items-center space-x-1">
                     <span>Topic Label</span>
-                    {sortField === 'name' && (
+                    {sortField === 'label' && (
                       sortDirection === 'asc' ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />
                     )}
                   </div>
@@ -126,11 +132,11 @@ const TopicsPage = () => {
                 <th
                   scope="col"
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => handleSort('volume')}
+                  onClick={() => handleSort('count')}
                 >
                   <div className="flex items-center space-x-1">
                     <span>Volume</span>
-                    {sortField === 'volume' && (
+                    {sortField === 'count' && (
                       sortDirection === 'asc' ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />
                     )}
                   </div>
@@ -150,11 +156,11 @@ const TopicsPage = () => {
                 <th
                   scope="col"
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => handleSort('week_over_week_delta')}
+                  onClick={() => handleSort('delta_week')}
                 >
                   <div className="flex items-center space-x-1">
                     <span>Week-over-Week</span>
-                    {sortField === 'week_over_week_delta' && (
+                    {sortField === 'delta_week' && (
                       sortDirection === 'asc' ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />
                     )}
                   </div>
@@ -166,32 +172,32 @@ const TopicsPage = () => {
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {sortedTopics.map((topic) => (
-                <tr key={topic.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <tr key={topic.topic_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {topic.name}
+                      {topic.label}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-gray-100">
-                      {topic.volume.toLocaleString()}
+                      {topic.count?.toLocaleString() || 0}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className={`text-sm font-medium ${getSentimentColor(topic.avg_sentiment)}`}>
-                      {topic.avg_sentiment.toFixed(2)}
+                    <div className={`text-sm font-medium ${getSentimentColor(Number(topic.avg_sentiment) || 0)}`}>
+                      {Number(topic.avg_sentiment || 0).toFixed(2)}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className={`flex items-center text-sm font-medium ${getDeltaColor(topic.week_over_week_delta)}`}>
-                      {topic.week_over_week_delta > 0 && <ArrowUpIcon className="h-4 w-4 mr-1" />}
-                      {topic.week_over_week_delta < 0 && <ArrowDownIcon className="h-4 w-4 mr-1" />}
-                      {topic.week_over_week_delta > 0 ? '+' : ''}{topic.week_over_week_delta.toFixed(1)}%
+                    <div className={`flex items-center text-sm font-medium ${getDeltaColor(Number(topic.delta_week) || 0)}`}>
+                      {Number(topic.delta_week) > 0 && <ArrowUpIcon className="h-4 w-4 mr-1" />}
+                      {Number(topic.delta_week) < 0 && <ArrowDownIcon className="h-4 w-4 mr-1" />}
+                      {Number(topic.delta_week) > 0 ? '+' : ''}{Number(topic.delta_week || 0).toFixed(1)}%
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Link
-                      to={`/topics/${topic.id}`}
+                      to={`/topics/${topic.topic_id}`}
                       className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
                     >
                       View Details →
