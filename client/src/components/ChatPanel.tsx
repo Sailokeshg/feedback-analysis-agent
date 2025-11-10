@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { apiUrl } from '../utils/api';
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
@@ -251,7 +252,7 @@ const ChatPanel = () => {
 
   // Fetch feedback snippet for a citation
   const fetchFeedbackSnippet = async (feedbackId: string): Promise<FeedbackSnippet> => {
-    const response = await fetch(`/api/feedback/${feedbackId}`);
+    const response = await fetch(apiUrl(`api/feedback/${feedbackId}`));
     if (!response.ok) {
       throw new Error('Failed to fetch feedback snippet');
     }
@@ -267,7 +268,7 @@ const ChatPanel = () => {
   // Chat mutation
   const chatMutation = useMutation({
     mutationFn: async (question: string): Promise<ChatResponse> => {
-      const response = await fetch('/api/chat/query', {
+      const response = await fetch(apiUrl('api/chat/query'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

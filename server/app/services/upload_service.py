@@ -1,7 +1,7 @@
 import pandas as pd
 import uuid
 from datetime import datetime
-from ..models.feedback import FeedbackItem
+from ..models.feedback import Feedback
 from .database import SessionLocal
 from .sentiment_service import SentimentService
 from .clustering_service import ClusteringService

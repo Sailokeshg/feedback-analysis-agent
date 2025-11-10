@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .middleware import RateLimitMiddleware
 from .routers import ingest_router, analytics_router, chat_router, admin_router, export_router
+from .api.router import router as api_router
 from .routers.metrics import router as metrics_router
 from .logging import setup_logging, LoggingSettings
 from .middleware.request_timing import RequestTimingMiddleware
@@ -62,10 +63,17 @@ app.include_router(
     tags=["admin"]
 )
 
+# API router (includes feedback, trends, topics, upload, query endpoints)
+app.include_router(
+    api_router,
+    prefix="/api",
+    tags=["api"]
+)
+
 # Export router
 app.include_router(
     export_router,
-    prefix="/api",
+    prefix="/api/export",
     tags=["export"]
 )
 

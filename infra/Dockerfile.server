@@ -8,12 +8,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy server requirements and install
-COPY server/pyproject.toml server/
-RUN pip install --no-cache-dir -e ./server
-
-# Copy server code
+# Copy server code and pyproject so editable install can find the package
 COPY server/ ./server/
+
+# Install server package in editable mode (so 'app' package is importable)
+RUN pip install --no-cache-dir -e ./server
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash app \
@@ -22,4 +21,4 @@ USER app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "server.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

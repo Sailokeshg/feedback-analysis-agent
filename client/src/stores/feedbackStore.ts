@@ -1,5 +1,11 @@
-import { create } from 'zustand';
-import { FeedbackItem, TopicCluster, SentimentTrend, QueryResult } from '../types';
+import { create } from "zustand";
+import {
+  FeedbackItem,
+  TopicCluster,
+  SentimentTrend,
+  QueryResult,
+} from "../types";
+import { apiUrl } from "../utils/api";
 
 interface FeedbackStore {
   feedbackItems: FeedbackItem[];
@@ -28,11 +34,15 @@ export const useFeedbackStore = create<FeedbackStore>((set, get) => ({
   fetchFeedback: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('/api/feedback');
+      const response = await fetch(apiUrl("api/feedback"), { cache: "no-store" });
+      if (!response.ok) {
+        set({ error: "Failed to fetch feedback" });
+        return;
+      }
       const data = await response.json();
       set({ feedbackItems: data });
     } catch (error) {
-      set({ error: 'Failed to fetch feedback' });
+      set({ error: "Failed to fetch feedback" });
     } finally {
       set({ isLoading: false });
     }
@@ -41,11 +51,15 @@ export const useFeedbackStore = create<FeedbackStore>((set, get) => ({
   fetchTopics: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('/api/topics');
+      const response = await fetch(apiUrl("api/topics"), { cache: "no-store" });
+      if (!response.ok) {
+        set({ error: "Failed to fetch topics" });
+        return;
+      }
       const data = await response.json();
       set({ topicClusters: data });
     } catch (error) {
-      set({ error: 'Failed to fetch topics' });
+      set({ error: "Failed to fetch topics" });
     } finally {
       set({ isLoading: false });
     }
@@ -54,11 +68,15 @@ export const useFeedbackStore = create<FeedbackStore>((set, get) => ({
   fetchTrends: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('/api/trends');
+      const response = await fetch(apiUrl("api/trends"), { cache: "no-store" });
+      if (!response.ok) {
+        set({ error: "Failed to fetch trends" });
+        return;
+      }
       const data = await response.json();
       set({ sentimentTrends: data });
     } catch (error) {
-      set({ error: 'Failed to fetch trends' });
+      set({ error: "Failed to fetch trends" });
     } finally {
       set({ isLoading: false });
     }
@@ -67,17 +85,17 @@ export const useFeedbackStore = create<FeedbackStore>((set, get) => ({
   askQuestion: async (query: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('/api/query', {
-        method: 'POST',
+      const response = await fetch(apiUrl("api/query"), {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ query }),
       });
       const data = await response.json();
       return data;
     } catch (error) {
-      set({ error: 'Failed to process query' });
+      set({ error: "Failed to process query" });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -88,15 +106,15 @@ export const useFeedbackStore = create<FeedbackStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
+      const response = await fetch(apiUrl("api/upload"), {
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        throw new Error("Upload failed");
       }
 
       // Refresh data after upload
@@ -106,7 +124,7 @@ export const useFeedbackStore = create<FeedbackStore>((set, get) => ({
         get().fetchTrends(),
       ]);
     } catch (error) {
-      set({ error: 'Failed to upload feedback' });
+      set({ error: "Failed to upload feedback" });
     } finally {
       set({ isLoading: false });
     }

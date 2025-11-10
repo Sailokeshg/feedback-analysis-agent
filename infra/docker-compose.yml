@@ -47,8 +47,8 @@ services:
       - "8001:8000"
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/feedback_db
-      - REDIS_URL=redis://redis:6379
-      - CHROMA_URL=http://chroma:8000
+      - EXTERNAL_REDIS_URL=redis://redis:6379
+      - EXTERNAL_CHROMA_URL=http://chroma:8000
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,8 +70,8 @@ services:
       dockerfile: infra/Dockerfile.worker
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/feedback_db
-      - REDIS_URL=redis://redis:6379
-      - CHROMA_URL=http://chroma:8000
+      - EXTERNAL_REDIS_URL=redis://redis:6379
+      - EXTERNAL_CHROMA_URL=http://chroma:8000
     depends_on:
       postgres:
         condition: service_healthy

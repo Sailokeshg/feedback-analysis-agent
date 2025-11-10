@@ -110,13 +110,19 @@ def setup_logging(settings: LoggingSettings = None) -> None:
     # Determine format based on settings
     formatter = json_formatter if settings.json_logs else text_formatter
 
-    # Add console handler
+    # Add console handler using a sink function to avoid Loguru format parsing
+    def _console_sink(message):
+        try:
+            out = formatter(message.record)
+        except Exception:
+            out = message.record.get("message", "")
+        # Ensure a newline
+        sys.stdout.write(out + "\n")
+
     logger.add(
-        sys.stdout,
-        format=formatter,
+        _console_sink,
         level=settings.log_level,
         colorize=not settings.json_logs,
-        serialize=False,  # We handle JSON formatting ourselves
     )
 
     # Add file handler if configured
@@ -126,14 +132,19 @@ def setup_logging(settings: LoggingSettings = None) -> None:
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
 
+        # File sink: write JSON lines. We use a simple sink function so we can
+        # control formatting and avoid Loguru's internal format parsing.
+        def _file_sink(message):
+            try:
+                out = json_formatter(message.record)
+            except Exception:
+                out = message.record.get("message", "")
+            with open(settings.log_file, "a", encoding="utf-8") as f:
+                f.write(out + "\n")
+
         logger.add(
-            settings.log_file,
-            format=json_formatter,  # Always use JSON for file logs
+            _file_sink,
             level=settings.log_level,
-            rotation=settings.log_rotation,
-            retention=settings.log_retention,
-            encoding="utf-8",
-            serialize=False,
         )
 
     # Configure third-party loggers to use our logger
@@ -145,7 +156,15 @@ def setup_logging(settings: LoggingSettings = None) -> None:
     # Add handlers for third-party loggers to redirect to loguru
     class LoguruHandler(logging.Handler):
         def emit(self, record):
-            logger.log(record.levelname, record.getMessage())
+            try:
+                # Use the Loguru logger to handle formatting via our sinks
+                logger.log(record.levelname, record.getMessage())
+            except Exception:
+                # Fallback to a minimal write to stderr to avoid crashing
+                try:
+                    sys.stderr.write(record.getMessage() + "\n")
+                except Exception:
+                    pass
 
     # Apply to common loggers
     for log_name in ["uvicorn", "uvicorn.access", "fastapi", "sqlalchemy"]:

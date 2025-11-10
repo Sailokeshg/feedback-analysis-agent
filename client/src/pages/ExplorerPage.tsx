@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { apiUrl } from '../utils/api';
 import { ChevronLeftIcon, ChevronRightIcon, FunnelIcon } from '@heroicons/react/24/outline';
 
 interface FeedbackItem {
@@ -41,7 +42,7 @@ const fetchExplorerResults = async (filters: ExplorerFilters, page: number = 1):
   if (filters.topic) params.set('topic', filters.topic);
   if (filters.search) params.set('search', filters.search);
 
-  const response = await fetch(`/api/feedback?${params.toString()}`);
+  const response = await fetch(apiUrl(`api/feedback?${params.toString()}`));
   if (!response.ok) {
     throw new Error('Failed to fetch explorer results');
   }
@@ -49,7 +50,7 @@ const fetchExplorerResults = async (filters: ExplorerFilters, page: number = 1):
 };
 
 const fetchTopicsList = async (): Promise<string[]> => {
-  const response = await fetch('/api/analytics/topics');
+  const response = await fetch(apiUrl('api/analytics/topics'));
   if (!response.ok) {
     throw new Error('Failed to fetch topics');
   }
@@ -87,11 +88,11 @@ const ExplorerPage = () => {
     setCurrentPage(1);
   }, [filters]);
 
-  const { data: results, isLoading, error } = useQuery({
+  const { data: results, isLoading, error } = useQuery<ExplorerResponse>({
     queryKey: ['explorer', filters, currentPage],
     queryFn: () => fetchExplorerResults(filters, currentPage),
     staleTime: 2 * 60 * 1000, // 2 minutes
-    cacheTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const { data: topics } = useQuery({

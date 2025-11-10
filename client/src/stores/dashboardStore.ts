@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DateRange, DashboardSummary } from '../types';
+import { apiUrl } from '../utils/api';
 
 interface DashboardState {
   dateRange: DateRange;
@@ -41,7 +42,7 @@ export const useDashboardStore = create<DashboardState>()(
           const startDate = dateRange.start.toISOString().split('T')[0];
           const endDate = dateRange.end.toISOString().split('T')[0];
 
-          const response = await fetch(`/api/analytics/dashboard/summary?start_date=${startDate}&end_date=${endDate}`);
+          const response = await fetch(apiUrl(`api/analytics/dashboard/summary?start_date=${startDate}&end_date=${endDate}`));
           if (!response.ok) {
             throw new Error('Failed to fetch dashboard summary');
           }

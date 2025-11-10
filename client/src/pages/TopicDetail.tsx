@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { apiUrl } from '../utils/api';
 
 interface FeedbackExample {
   id: string;
@@ -26,7 +27,7 @@ const fetchTopicExamples = async (
   pageSize: number = 20
 ): Promise<TopicExamplesResponse> => {
   const response = await fetch(
-    `/api/analytics/examples?topic=${topicId}&page=${page}&page_size=${pageSize}`
+    apiUrl(`api/analytics/examples?topic=${topicId}&page=${page}&page_size=${pageSize}`)
   );
   if (!response.ok) {
     throw new Error('Failed to fetch topic examples');
@@ -39,12 +40,12 @@ const TopicDetail = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<TopicExamplesResponse>({
     queryKey: ['topic-examples', topicId, currentPage],
     queryFn: () => fetchTopicExamples(topicId!, currentPage, pageSize),
     enabled: !!topicId,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
   const getSentimentColor = (sentiment: string) => {

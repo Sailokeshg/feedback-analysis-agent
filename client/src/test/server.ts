@@ -1,13 +1,14 @@
 import { setupServer } from 'msw/node'
-import { rest } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { createMockFeedback, createMockTopic, createMockAnalyticsData, sampleFeedbackList, sampleTopicsData } from './test-utils'
 
 // Mock API handlers
 export const handlers = [
   // Feedback endpoints
-  rest.get('/api/feedback', (req, res, ctx) => {
-    const page = req.url.searchParams.get('page') || '1'
-    const pageSize = req.url.searchParams.get('page_size') || '10'
+  http.get('/api/feedback', ({ request }) => {
+    const url = new URL(request.url)
+    const page = url.searchParams.get('page') || '1'
+    const pageSize = url.searchParams.get('page_size') || '10'
     const source = req.url.searchParams.get('source')
     const startDate = req.url.searchParams.get('start_date')
     const endDate = req.url.searchParams.get('end_date')

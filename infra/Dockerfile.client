@@ -12,7 +12,8 @@ RUN npm ci
 # Copy client source
 COPY client/ ./client/
 
-# Build the client
+# Build the client with API URL environment variable
+ENV VITE_API_URL=http://localhost:8001
 RUN npm run build --workspace=client
 
 # Install serve to serve the built app

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { apiUrl } from '../utils/api';
 import { ChevronUpIcon, ChevronDownIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 
 interface TopicAnalytics {
@@ -13,7 +14,7 @@ interface TopicAnalytics {
 }
 
 const fetchTopicsAnalytics = async (): Promise<TopicAnalytics[]> => {
-  const response = await fetch('/api/analytics/topics');
+  const response = await fetch(apiUrl('api/analytics/topics'));
   if (!response.ok) {
     throw new Error('Failed to fetch topics analytics');
   }
@@ -28,7 +29,7 @@ const TopicsPage = () => {
     queryKey: ['topics-analytics'],
     queryFn: fetchTopicsAnalytics,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
   const sortedTopics = useMemo(() => {
