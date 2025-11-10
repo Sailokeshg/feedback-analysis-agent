@@ -11,6 +11,14 @@ const Dashboard = () => {
   const { feedbackItems, topicClusters, isLoading, error } = useFeedbackStore();
   const { fetchDashboardSummary } = useDashboardStore();
 
+  // Helper function to convert sentiment integer to string
+  const getSentimentString = (sentiment: any): string => {
+    if (sentiment === -1 || sentiment === 'negative') return 'negative';
+    if (sentiment === 1 || sentiment === 'positive') return 'positive';
+    if (sentiment === 0 || sentiment === 'neutral') return 'neutral';
+    return 'neutral'; // default fallback
+  };
+
   // Initialize dashboard data on mount
   useEffect(() => {
     fetchDashboardSummary();
@@ -39,9 +47,9 @@ const Dashboard = () => {
   const safeFeedbackItems = Array.isArray(feedbackItems) ? feedbackItems : [];
 
   const sentimentData = [
-    { name: 'Positive', value: safeFeedbackItems.filter(f => f.sentiment === 'positive').length },
-    { name: 'Negative', value: safeFeedbackItems.filter(f => f.sentiment === 'negative').length },
-    { name: 'Neutral', value: safeFeedbackItems.filter(f => f.sentiment === 'neutral').length },
+    { name: 'Positive', value: safeFeedbackItems.filter(f => getSentimentString(f.sentiment) === 'positive').length },
+    { name: 'Negative', value: safeFeedbackItems.filter(f => getSentimentString(f.sentiment) === 'negative').length },
+    { name: 'Neutral', value: safeFeedbackItems.filter(f => getSentimentString(f.sentiment) === 'neutral').length },
   ];
 
   const COLORS = ['#3b82f6', '#ef4444', '#6b7280'];
@@ -133,13 +141,13 @@ const Dashboard = () => {
               className="p-4 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
             >
               <div className={`font-semibold text-sm mb-2 ${
-                item.sentiment === 'positive'
+                getSentimentString(item.sentiment) === 'positive'
                   ? 'text-green-600 dark:text-green-400'
-                  : item.sentiment === 'negative'
+                  : getSentimentString(item.sentiment) === 'negative'
                   ? 'text-red-600 dark:text-red-400'
                   : 'text-gray-600 dark:text-gray-400'
               }`}>
-                {item.sentiment.toUpperCase()} - {item.topic_cluster}
+                {getSentimentString(item.sentiment).toUpperCase()} - {item.topic_cluster}
               </div>
               <div className="text-sm text-gray-900 dark:text-gray-100 mb-2">{item.text}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">

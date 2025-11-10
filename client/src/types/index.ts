@@ -1,7 +1,7 @@
 export interface FeedbackItem {
   id: string;
   text: string;
-  sentiment: 'positive' | 'negative' | 'neutral';
+  sentiment: 'positive' | 'negative' | 'neutral' | -1 | 0 | 1;
   sentiment_score: number;
   topic_cluster: string;
   created_at: string;

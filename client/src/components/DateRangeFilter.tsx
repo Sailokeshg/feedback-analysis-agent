@@ -8,8 +8,8 @@ const DateRangeFilter = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [localDateRange, setLocalDateRange] = useState<DateRange>({
-    start: dateRange.start,
-    end: dateRange.end,
+    start: dateRange.start instanceof Date ? dateRange.start : new Date(dateRange.start),
+    end: dateRange.end instanceof Date ? dateRange.end : new Date(dateRange.end),
   });
 
   // Sync URL params to local state on mount and URL changes
@@ -26,8 +26,15 @@ const DateRangeFilter = () => {
         setLocalDateRange(newRange);
         setDateRange(newRange);
       }
+    } else {
+      // If no URL params, ensure local state has valid Date objects
+      const currentRange = {
+        start: dateRange.start instanceof Date ? dateRange.start : new Date(dateRange.start),
+        end: dateRange.end instanceof Date ? dateRange.end : new Date(dateRange.end),
+      };
+      setLocalDateRange(currentRange);
     }
-  }, [searchParams, setDateRange]);
+  }, [searchParams, setDateRange, dateRange]);
 
   const handleDateChange = (type: 'start' | 'end', value: string) => {
     const date = new Date(value);
@@ -50,8 +57,13 @@ const DateRangeFilter = () => {
     setDateRange(newRange);
   };
 
-  const formatDateForInput = (date: Date) => {
-    return date.toISOString().split('T')[0];
+  const formatDateForInput = (date: any) => {
+    const dateObj = date instanceof Date ? date : new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      // Fallback to today's date if invalid
+      return new Date().toISOString().split('T')[0];
+    }
+    return dateObj.toISOString().split('T')[0];
   };
 
   return (
