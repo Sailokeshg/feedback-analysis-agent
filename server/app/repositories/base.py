@@ -51,7 +51,7 @@ class DateFilter:
 
     def to_params(self) -> Dict[str, Any]:
         """Generate parameter dictionary for date filtering."""
-        params = {}
+        params: Dict[str, Any] = {}
         if self.start_date:
             params["start_date"] = self.start_date
         if self.end_date:
@@ -153,10 +153,10 @@ class BaseRepository(Generic[T]):
             result = self.session.execute(text(query), params)
 
             if fetch == "all":
-                return [dict(row) for row in result.fetchall()]
+                return [row._asdict() for row in result.fetchall()]
             elif fetch == "one":
                 row = result.fetchone()
-                return dict(row) if row else None
+                return row._asdict() if row else None
             elif fetch == "scalar":
                 return result.scalar()
             elif fetch == "none":
@@ -171,7 +171,8 @@ class BaseRepository(Generic[T]):
         """
         # Check that all parameters used in query are provided
         import re
-        param_names = set(re.findall(r':([a-zA-Z_][a-zA-Z0-9_]*)', query))
+        # Find parameter placeholders like :param_name, but exclude PostgreSQL type casting ::type
+        param_names = set(re.findall(r'(?<!:):([a-zA-Z_][a-zA-Z0-9_]*)', query))
         provided_params = set(params.keys())
 
         if param_names != provided_params:
@@ -207,6 +208,10 @@ class BaseRepository(Generic[T]):
         """Execute a query with retry logic and safety validation."""
         if validate_safety:
             self._validate_sql_injection_safe(query, params or {})
+
+        # Temporarily disable validation to debug
+        # if validate_safety:
+        #     self._validate_sql_injection_safe(query, params or {})
 
         return self._execute_parameterized_query(query, params, fetch)
 
