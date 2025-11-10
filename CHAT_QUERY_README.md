@@ -14,10 +14,15 @@ The `/chat/query` endpoint provides natural language querying of customer feedba
 
 ## API Specification
 
-### Endpoint
+### Endpoints
 
 ```
-POST /api/v1/chat/query
+POST /chat/chat/query          # Primary chat query endpoint
+POST /chat/query               # Legacy endpoint for backward compatibility
+GET /chat/conversations        # Get conversation history
+POST /chat/feedback/{id}/clarify  # Get clarification about specific feedback
+POST /chat/clear-memory        # Clear conversation memory
+GET /chat/suggestions          # Get query suggestions
 ```
 
 ### Request Format
@@ -159,7 +164,7 @@ Each citation is validated against the database to retrieve the associated `topi
 ### Basic Query
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/chat/query" \
+curl -X POST "http://localhost:8001/chat/chat/query" \
   -H "Content-Type: application/json" \
   -d '{
     "question": "What are the main customer complaints?"
@@ -169,7 +174,7 @@ curl -X POST "http://localhost:8000/api/v1/chat/query" \
 ### Filtered Query
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/chat/query" \
+curl -X POST "http://localhost:8001/chat/chat/query" \
   -H "Content-Type: application/json" \
   -d '{
     "question": "Show me recent negative feedback",
@@ -183,7 +188,7 @@ curl -X POST "http://localhost:8000/api/v1/chat/query" \
 ### Complex Filtering
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/chat/query" \
+curl -X POST "http://localhost:8001/chat/chat/query" \
   -H "Content-Type: application/json" \
   -d '{
     "question": "What do customers say about our mobile app?",
@@ -193,6 +198,24 @@ curl -X POST "http://localhost:8000/api/v1/chat/query" \
       "language": "en"
     }
   }'
+```
+
+### Additional Chat Endpoints
+
+```bash
+# Get conversation history
+curl "http://localhost:8001/chat/conversations"
+
+# Get query suggestions
+curl "http://localhost:8001/chat/suggestions"
+
+# Clear conversation memory
+curl -X POST "http://localhost:8001/chat/clear-memory"
+
+# Get clarification about specific feedback
+curl -X POST "http://localhost:8001/chat/feedback/123e4567-e89b-12d3-a456-426614174000/clarify" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Can you explain this feedback in more detail?"}'
 ```
 
 ## Load Testing
@@ -265,6 +288,43 @@ X-RateLimit-Reset: 1640995200
 - **Request Logging**: Question, filters, and processing time
 - **Error Logging**: Detailed error information with context
 - **Performance Logging**: Response times and citation counts
+
+## Conversation Management
+
+### Memory and Context
+
+The chat system maintains conversation context across requests:
+
+- **Memory Persistence**: Conversations are stored and can be retrieved
+- **Context Window**: Previous interactions influence responses
+- **Memory Clearing**: Explicit endpoint to reset conversation state
+- **Citation Tracking**: All responses include source citations for verification
+
+### Conversation History
+
+```json
+{
+  "conversations": [
+    {
+      "id": "conv_123",
+      "question": "What are main customer complaints?",
+      "answer": "Customers complain about...",
+      "timestamp": "2024-01-15T10:30:00Z",
+      "citations": ["fb_123", "fb_456"]
+    }
+  ],
+  "total": 1,
+  "has_more": false
+}
+```
+
+### Query Suggestions
+
+The system provides intelligent query suggestions based on:
+- **Popular Topics**: Frequently discussed subjects
+- **Recent Trends**: Current customer concerns
+- **Data Patterns**: Statistical insights from feedback
+- **User History**: Previous query patterns
 
 ## Future Enhancements
 

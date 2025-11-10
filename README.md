@@ -31,49 +31,95 @@ make docker-up
 
 ### Step 3: Access the Application
 - **Dashboard**: http://localhost:3000
-- **API Docs**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
+- **API Docs**: http://localhost:8001/docs
+- **Health Check**: http://localhost:8001/health
+- **Database Health**: http://localhost:8001/admin/health/database
 
 ### Step 4: Add Sample Data
 ```bash
 # Upload sample feedback via API
-curl -X POST http://localhost:8000/api/upload/csv \
+curl -X POST http://localhost:8001/ingest/upload/csv \
   -F "file=@server/test_data/sample_feedback.csv"
 ```
 
 ### Step 5: Explore Features
 1. View sentiment trends in the dashboard
 2. Ask questions via the chat interface
-3. Check metrics at http://localhost:8000/metrics (dev mode)
+3. Check analytics at http://localhost:8001/analytics/summary
+4. Check metrics at http://localhost:8001/metrics (dev mode)
 
 ## 🏗️ Architecture
 
 ```mermaid
 graph TB
-    A[React Dashboard<br/>localhost:3000] --> B[FastAPI Server<br/>localhost:8000]
-    B --> C[PostgreSQL<br/>localhost:5432]
-    B --> D[Redis Queue<br/>localhost:6379]
-    B --> E[Chroma Vector DB<br/>localhost:8000]
+    subgraph "Client Layer"
+        A[React Dashboard<br/>localhost:3000]
+        A1[Zustand + React Query]
+        A2[Real-time Charts]
+        A3[Chat Interface]
+    end
 
-    D --> F[RQ Worker]
-    F --> C
-    F --> E
+    subgraph "API Gateway Layer"
+        B[FastAPI Server<br/>localhost:8001]
+        B1[Request Routing<br/>/analytics, /chat, /admin, /ingest]
+        B2[JWT Authentication]
+        B3[Rate Limiting & CORS]
+        B4[Structured Logging]
+    end
 
-    B --> G[Metrics Endpoint<br/>/metrics]
-    B --> H[Health Checks<br/>/health]
+    subgraph "Service Layer"
+        C[Analytics Service<br/>Trends & KPIs]
+        D[Chat Service<br/>AI Agent Queries]
+        E[Admin Service<br/>Topic Management]
+        F[Ingestion Service<br/>Data Processing]
+        G[Export Service<br/>CSV Generation]
+    end
+
+    subgraph "Data Layer"
+        H[(PostgreSQL<br/>localhost:5432)]
+        I[(Redis Cache<br/>localhost:6379)]
+        J[(Chroma Vector DB<br/>localhost:8000)]
+    end
+
+    subgraph "Worker Layer"
+        K[RQ Worker Process]
+        K1[ML Model Inference]
+        K2[Batch Processing]
+        K3[Background Tasks]
+    end
+
+    A --> B
+    B --> C
+    B --> D
+    B --> E
+    B --> F
+    B --> G
+
+    C --> H
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+
+    B --> I
+    I --> K
+    K --> H
+    K --> J
 
     style A fill:#e1f5fe
     style B fill:#f3e5f5
-    style F fill:#e8f5e8
-    style G fill:#fff3e0
-    style H fill:#ffebee
+    style K fill:#e8f5e8
+    style I fill:#fff3e0
 ```
 
 **Components:**
-- **Client**: React dashboard with real-time charts and chat interface
-- **Server**: FastAPI backend with sentiment analysis and vector search
-- **Worker**: RQ-based background processing for heavy ML tasks
-- **Infrastructure**: Docker Compose with PostgreSQL, Redis, and Chroma
+- **Client**: React dashboard with Zustand state management, React Query, and real-time chat
+- **Server**: FastAPI with organized routers for analytics, chat, admin, and ingestion
+- **Analytics**: Advanced analytics with caching, trends, and dashboard summaries
+- **Chat**: AI-powered chat interface with LangChain agent and conversation history
+- **Admin**: Administrative functions for topic management and system maintenance
+- **Worker**: RQ-based background processing for ML tasks and heavy computations
+- **Infrastructure**: Docker Compose with PostgreSQL, Redis caching, and Chroma vector database
 
 ## 🔄 Backup & Export
 
@@ -100,14 +146,14 @@ RETENTION_DAYS=30
 ### CSV Data Export
 ```bash
 # Export all feedback
-curl -o feedback.csv "http://localhost:8000/api/export.csv"
+curl -o feedback.csv "http://localhost:8001/api/export/export.csv"
 
 # Export filtered feedback
-curl -o filtered.csv "http://localhost:8000/api/export.csv?source=website&start_date=2024-01-01"
+curl -o filtered.csv "http://localhost:8001/api/export/export.csv?source=website&start_date=2024-01-01"
 
 # Export topics and analytics
-curl -o topics.csv "http://localhost:8000/api/export/topics.csv"
-curl -o analytics.csv "http://localhost:8000/api/export/analytics.csv"
+curl -o topics.csv "http://localhost:8001/api/export/export/topics.csv"
+curl -o analytics.csv "http://localhost:8001/api/export/export/analytics.csv"
 ```
 
 📖 **[Complete Backup & Export Guide](./docs/backup_and_export.md)**
@@ -227,9 +273,11 @@ make dev
 
 # The application will be available at:
 # - Frontend: http://localhost:3000
-# - API: http://localhost:8000
-# - API Docs: http://localhost:8000/docs
-# - Metrics: http://localhost:8000/metrics (dev only)
+# - API: http://localhost:8001
+# - API Docs: http://localhost:8001/docs
+# - Analytics: http://localhost:8001/analytics/summary
+# - Health: http://localhost:8001/health
+# - Metrics: http://localhost:8001/metrics (dev only)
 ```
 
 ### Running Tests
@@ -338,15 +386,18 @@ docker-compose -f infra/docker-compose.yml logs -f
 #### Check Health Endpoints
 ```bash
 # API health
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
-# Database connectivity
-curl http://localhost:8000/healthz
+# Kubernetes health check
+curl http://localhost:8001/healthz
+
+# Database connectivity (admin)
+curl http://localhost:8001/admin/health/database
 ```
 
 #### View Metrics (Development Only)
 ```bash
-curl http://localhost:8000/metrics
+curl http://localhost:8001/metrics
 ```
 
 ### Performance Issues
@@ -387,7 +438,8 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 **Quick Links:**
-- [API Documentation](http://localhost:8000/docs)
+- [API Documentation](http://localhost:8001/docs)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Architecture Details](docs/architecture.md)
 - [API Reference](docs/api.md)
+- [Admin Topic Management](docs/admin_topic_management.md)

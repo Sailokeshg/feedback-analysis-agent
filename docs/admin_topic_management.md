@@ -20,6 +20,18 @@ The admin topic management interface allows administrators to:
    - **Viewer**: `viewer` / `viewer123` (read-only)
 3. Navigate to "Topic Management" in the admin navigation
 
+### JWT Authentication
+
+All admin API endpoints require JWT authentication. Include the token in requests:
+
+```http
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+```
+
+**Token Expiration**: 24 hours
+**Refresh**: Re-login when token expires
+**Security**: Tokens are validated on each request
+
 ### Interface Layout
 
 The admin interface consists of two panels:
@@ -126,6 +138,53 @@ Access audit logs via:
 
 ## 🔧 API Endpoints
 
+### Authentication
+
+```http
+POST /admin/login
+# Admin login with JWT token
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+POST /admin/viewer/login
+# Viewer login (read-only access)
+{
+  "username": "viewer",
+  "password": "viewer123"
+}
+```
+
+### System Management
+
+```http
+GET /admin/stats
+# Get comprehensive system statistics
+
+GET /admin/health/database
+# Check database connectivity and health
+
+GET /admin/config
+# Get system configuration (admin only)
+
+POST /admin/maintenance/refresh-materialized-view
+# Refresh database materialized views
+
+POST /admin/cleanup/old-data
+# Remove old feedback data
+{
+  "days_old": 365,
+  "dry_run": true
+}
+
+GET /admin/logs/recent
+# Get recent application logs
+
+POST /admin/cache/clear
+# Clear Redis cache
+```
+
 ### Topics Management
 
 ```http
@@ -150,8 +209,8 @@ GET /admin/topics/{topic_id}/feedback
 POST /admin/reassign-feedback
 # Reassign feedback to different topic
 {
-  "feedback_id": "uuid-string",
-  "new_topic_id": 2,
+  "feedback_ids": ["uuid-string"],
+  "target_topic_id": 2,
   "reason": "Incorrect classification"
 }
 ```
@@ -160,10 +219,23 @@ POST /admin/reassign-feedback
 
 ```http
 GET /admin/topic-audit
-# Get recent audit logs
+# Get recent audit logs (paginated)
 
 GET /admin/topic-audit/{topic_id}
 # Get audit history for specific topic
+```
+
+### Viewer Endpoints
+
+```http
+GET /admin/viewer/stats
+# Get statistics for viewer dashboard
+
+GET /admin/viewer/dashboard
+# Get dashboard data for viewers
+
+GET /admin/viewer/profile
+# Get viewer profile information
 ```
 
 ## 🚨 Safety & Best Practices

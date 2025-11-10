@@ -17,8 +17,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Test configuration
-API_BASE_URL = "http://localhost:8000"  # Adjust if different
-CHAT_QUERY_ENDPOINT = f"{API_BASE_URL}/api/v1/chat/query"
+API_BASE_URL = "http://localhost:8001"  # Adjust if different
+CHAT_QUERY_ENDPOINT = f"{API_BASE_URL}/chat/chat/query"
 CONCURRENT_REQUESTS = 5
 TEST_QUESTIONS = [
     "What are the main topics in customer feedback?",

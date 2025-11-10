@@ -9,7 +9,7 @@ import time
 import os
 
 # Server URL - adjust if running on different port
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8001"
 
 def test_csv_ingestion():
     """Test CSV file ingestion."""

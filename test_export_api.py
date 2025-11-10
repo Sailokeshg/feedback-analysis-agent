@@ -68,7 +68,7 @@ def main():
     print("=" * 50)
 
     # Configuration
-    base_url = "http://localhost:8000"  # Adjust if your server runs on different port
+    base_url = "http://localhost:8001"  # Adjust if your server runs on different port
 
     # Check if server is running
     try:

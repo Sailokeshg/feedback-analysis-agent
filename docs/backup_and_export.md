@@ -146,6 +146,9 @@ psql $DATABASE_URL -c "SELECT COUNT(*) FROM topic;"
 # Run application health checks
 curl http://your-app/health
 
+# Check database health (admin access required)
+curl http://your-app/admin/health/database
+
 # Test API endpoints
 curl http://your-app/api/feedback?page=1&page_size=1
 ```
@@ -158,7 +161,7 @@ The system provides streaming CSV export endpoints for data analysis and backup 
 
 #### 1. Feedback Export
 ```http
-GET /api/export.csv?[filters]
+GET /api/export/export.csv?[filters]
 ```
 
 **Query Parameters:**
@@ -172,18 +175,18 @@ GET /api/export.csv?[filters]
 **Example:**
 ```bash
 # Export all feedback
-curl -o feedback.csv "http://your-app/api/export.csv"
+curl -o feedback.csv "http://your-app/api/export/export.csv"
 
 # Export feedback from specific source and date range
-curl -o filtered_feedback.csv "http://your-app/api/export.csv?source=website&start_date=2024-01-01&end_date=2024-12-31"
+curl -o filtered_feedback.csv "http://your-app/api/export/export.csv?source=website&start_date=2024-01-01&end_date=2024-12-31"
 
 # Export feedback with sentiment filter
-curl -o positive_feedback.csv "http://your-app/api/export.csv?sentiment_min=0.7"
+curl -o positive_feedback.csv "http://your-app/api/export/export.csv?sentiment_min=0.7"
 ```
 
 #### 2. Topics Export
 ```http
-GET /api/export/topics.csv?min_feedback_count=1
+GET /api/export/export/topics.csv?min_feedback_count=1
 ```
 
 **Query Parameters:**
@@ -192,12 +195,12 @@ GET /api/export/topics.csv?min_feedback_count=1
 **Example:**
 ```bash
 # Export all topics with at least 5 feedback items
-curl -o topics.csv "http://your-app/api/export/topics.csv?min_feedback_count=5"
+curl -o topics.csv "http://your-app/api/export/export/topics.csv?min_feedback_count=5"
 ```
 
 #### 3. Analytics Export
 ```http
-GET /api/export/analytics.csv?[date_filters]
+GET /api/export/export/analytics.csv?[date_filters]
 ```
 
 **Query Parameters:**
@@ -207,7 +210,7 @@ GET /api/export/analytics.csv?[date_filters]
 **Example:**
 ```bash
 # Export analytics for current month
-curl -o analytics.csv "http://your-app/api/export/analytics.csv?start_date=2024-11-01"
+curl -o analytics.csv "http://your-app/api/export/export/analytics.csv?start_date=2024-11-01"
 ```
 
 ### 📋 CSV Format Specifications
@@ -270,7 +273,7 @@ const exportData = async (endpoint, filename) => {
 };
 
 // Usage
-exportData('/api/export.csv?source=website', 'website_feedback.csv');
+exportData('/api/export/export.csv?source=website', 'website_feedback.csv');
 ```
 
 ### 📊 Export Monitoring
@@ -319,6 +322,9 @@ psql $DATABASE_URL -c "SELECT COUNT(*) FROM feedback;"
 
 # Verify API is running
 curl http://your-app/health
+
+# Check database connectivity (admin)
+curl http://your-app/admin/health/database
 ```
 
 **"Memory error on large exports"**

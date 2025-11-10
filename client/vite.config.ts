@@ -19,9 +19,8 @@ export default defineConfig(({ command, mode }) => {
       port: 3000,
       proxy: {
         "/api": {
-          // For local development, proxy to the server running on port 8000
-          // (Docker development would use port 8001)
-          target: "http://localhost:8000",
+          // For local development, proxy to the server running on port 8001
+          target: "http://localhost:8001",
           changeOrigin: true,
         },
       },

@@ -33,7 +33,7 @@ Logging is configured in `app/logging.py` with the following features:
   "line": 45,
   "request_id": "550e8400-e29b-41d4-a716-446655440000",
   "method": "GET",
-  "url": "http://localhost:8000/api/feedback",
+  "url": "http://localhost:8001/api/feedback",
   "client_ip": "192.168.1.100"
 }
 ```

@@ -13,7 +13,7 @@ graph TB
     end
 
     subgraph "API Gateway Layer"
-        B[FastAPI Server<br/>localhost:8000]
+        B[FastAPI Server<br/>localhost:8001]
         B1[Request Timing Middleware]
         B2[Structured Logging]
         B3[Rate Limiting]
@@ -107,7 +107,7 @@ graph TB
 
 ### API Gateway Layer
 
-**FastAPI Server (localhost:8000)**
+**FastAPI Server (localhost:8001)**
 - **Framework**: FastAPI with automatic OpenAPI docs
 - **Middleware Stack**:
   - Request timing and logging
@@ -115,12 +115,38 @@ graph TB
   - CORS handling
   - Structured logging with request IDs
 - **Validation**: Pydantic models for all I/O
-- **Authentication**: JWT-based auth (future)
+- **Authentication**: JWT-based auth with admin/viewer roles
 - **Monitoring**: Prometheus metrics endpoint
 
 ### Service Layer
 
-**Core Services**:
+**Router-Based Services**:
+- **Analytics Router** (`/analytics/*`): Advanced analytics with caching
+  - Sentiment trends, volume trends, customer statistics
+  - Toxicity analysis, dashboard summaries, feedback examples
+  - 5-minute Redis caching for performance
+
+- **Chat Router** (`/chat/*`): AI-powered conversational queries
+  - LangChain agent integration with OpenAI GPT
+  - Conversation history and context management
+  - Advanced filtering by date, sentiment, topics, etc.
+
+- **Admin Router** (`/admin/*`): Administrative operations
+  - JWT-based authentication (admin/viewer roles)
+  - Topic management and audit logging
+  - System maintenance and health monitoring
+
+- **Ingestion Router** (`/ingest/*`): Data intake operations
+  - Single/batch feedback creation
+  - CSV/JSONL file uploads with background processing
+  - Async job queuing with RQ
+
+- **Export Router** (`/api/export/*`): Data export capabilities
+  - Streaming CSV exports with filtering
+  - Feedback, topics, and analytics data export
+  - Large dataset handling with pagination
+
+**Core ML Services**:
 - **SentimentService**: VADER/HuggingFace sentiment analysis
 - **ClusteringService**: Topic clustering with HDBSCAN/UMAP
 - **EmbeddingService**: Sentence transformers for vectorization
@@ -131,7 +157,9 @@ graph TB
 - Dependency injection for testability
 - Strategy pattern for ML model selection
 - Repository pattern for data access
-- Service layer for business logic
+- Router-based service organization
+- Async job processing with RQ
+- Redis caching for performance
 
 ### Data Layer
 
@@ -228,9 +256,11 @@ sequenceDiagram
 ## Security Architecture
 
 ### Authentication & Authorization
-- JWT-based authentication (planned)
-- Role-based access control
-- API key management for external integrations
+- JWT-based authentication with Bearer tokens
+- Role-based access control (Admin/Viewer roles)
+- Admin endpoints require authentication
+- Viewer role for read-only analytics access
+- API key management for external integrations (planned)
 
 ### Data Protection
 - Input validation and sanitization
@@ -259,10 +289,10 @@ sequenceDiagram
 - **Log aggregation**: File rotation and retention
 
 ### Health Checks
-- **Application health**: /health endpoint
-- **Database connectivity**: /healthz endpoint
-- **Dependency checks**: External service availability
-- **Metrics endpoint**: /metrics (development only)
+- **Application health**: `/health` endpoint (basic status)
+- **Kubernetes health**: `/healthz` endpoint (simple "ok" response)
+- **Database health**: `/admin/health/database` endpoint (detailed connectivity check)
+- **Metrics endpoint**: `/metrics` (Prometheus format, development only)
 
 ## Deployment Architecture
 
@@ -283,10 +313,12 @@ sequenceDiagram
 ## Performance Characteristics
 
 ### Scalability
-- **Horizontal scaling**: Stateless API servers
-- **Queue-based processing**: Async job handling
-- **Database optimization**: Connection pooling, indexing
-- **Caching strategy**: Redis for session and query caching
+- **Horizontal scaling**: Stateless API servers with router-based organization
+- **Queue-based processing**: RQ async job handling for ML tasks
+- **Database optimization**: Connection pooling, indexing, materialized views
+- **Caching strategy**: Redis for analytics caching (5-minute TTL) and session management
+- **Streaming exports**: Large dataset handling without memory issues
+- **Rate limiting**: Configurable limits per endpoint type
 
 ### Performance Targets
 - **API Response Time**: <500ms for 95th percentile
@@ -294,13 +326,22 @@ sequenceDiagram
 - **Concurrent Users**: 100+ simultaneous connections
 - **Feedback Processing**: 1000 items/minute
 
-## Future Enhancements
+## Current Features & Future Enhancements
 
-### Planned Architecture Improvements
-- **Microservices decomposition**
-- **Event-driven architecture**
-- **GraphQL API** for flexible queries
-- **Real-time WebSocket connections**
-- **Advanced ML model serving**
-- **Multi-region deployment**
-- **Advanced security features**
+### Implemented Features (v0.2.0)
+- **Router-based architecture** with organized service endpoints
+- **JWT authentication** with role-based access control
+- **Advanced analytics** with Redis caching and dashboard summaries
+- **AI chat integration** with LangChain agent and conversation history
+- **Admin panel** for topic management and system maintenance
+- **Streaming CSV exports** with filtering and large dataset support
+- **Comprehensive health checks** and monitoring endpoints
+
+### Future Enhancements
+- **Microservices decomposition** for individual service scaling
+- **Event-driven architecture** with message queues
+- **GraphQL API** for flexible client queries
+- **Real-time WebSocket connections** for live updates
+- **Advanced ML model serving** with model versioning
+- **Multi-region deployment** with data replication
+- **Advanced security features** (API keys, OAuth integration)
